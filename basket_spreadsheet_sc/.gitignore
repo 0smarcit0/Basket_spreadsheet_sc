@@ -22,7 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
+''
+.next
+next-env.d.ts
 # OS generated files
 cache/*
 spreadsheets/*
+build
