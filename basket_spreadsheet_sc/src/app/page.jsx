@@ -1,31 +1,30 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import { Plus, Menu, Search, CircleQuestionMark, Settings } from 'lucide-react';
 import Navbar from './components/Navbar';
 import OptionButton from './components/OptionButton';
 
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      console.log("Activando modo oscuro");
-    } else {
-      console.log("Desactivando modo oscuro");
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+    useEffect(() => {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        console.log("Activando modo oscuro");
+      }  else {
+        console.log("Desactivando modo oscuro");
+        document.documentElement.classList.remove('dark');
+      }
+    }, [isDarkMode]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black font-sans transition-colors duration-300 flex flex-col">
-      {/* Se cambió max-w-md por max-w-6xl para pantallas más grandes y se ajustó el borde */}
       <div className="w-full max-w-6xl mx-auto min-h-screen flex flex-col shadow-none sm:shadow-sm sm:border-x border-gray-100 dark:border-gray-900 relative">
-        
         <Navbar 
           isDarkMode={isDarkMode} 
           toggleTheme={() => setIsDarkMode(!isDarkMode)} 
-        />
+          />
+        
 
         <main className="flex-grow p-4 sm:p-6 md:p-8 flex flex-col">
           <div className="mb-8 md:mb-10">
@@ -37,7 +36,6 @@ export default function App() {
             </h1>
           </div>
 
-          {/* Grid responsivo: 1 col en móvil, 2 cols en tablet, 3 cols en PC */}
           <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             <OptionButton
               title="Nueva planilla"
