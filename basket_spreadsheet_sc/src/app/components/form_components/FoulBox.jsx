@@ -1,25 +1,35 @@
 "use client"
 import { useFormContext, useController } from "react-hook-form"
-import {X} from "lucide-react"
-export default function FoulBox({ group, period, index }) {
-  const { control } = useFormContext()
+import { useEffect, useState } from "react"
+
+export default function FoulBox({ group, period, index, quarter, color }) {
+  const { control, setValue } = useFormContext()
   const name = `${group}.fouls.p${period}.${index}`
+  const classname ='w-8 h-8 border-2 border-black flex items-center justify-center bg-transparent focus:outline-none '+color
+  const [val, setVal] = useState("x")
+
 
   const { field } = useController({
     name,
     control,
     defaultValue: false,
   })
+  useEffect(()=>{
+    
+    if(period<quarter && !field.value){
+       setValue(name,!field.value)
+       setVal("=")
+    }
+  }, [val, field,period, quarter, setVal])
 
   return (
     <button
       type="button"
       aria-pressed={field.value}
       onClick={() => field.onChange(!field.value)}
-      className="w-8 h-8 border-2 border-black flex items-center justify-center
-                 bg-transparent focus:outline-none"
+      className={classname}
     >
-      {field.value && <X className="w-6 h-6" strokeWidth={2.5} />}
+      {field.value && val}
     </button>
   )
 }

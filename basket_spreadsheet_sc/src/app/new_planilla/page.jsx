@@ -14,7 +14,7 @@ export default function FormPlanilla() {
         alert(JSON.stringify(data))
     }
     const handleChangeQuarter = ()=>{
-        if (quarter < 4){
+        if (quarter < 8){
             setQuarter(quarter+1)
         }
 

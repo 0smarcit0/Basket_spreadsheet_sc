@@ -1,18 +1,55 @@
 "use client"
 import TimeoutBox from "./TimeoutBox"
+import { useEffect, useRef } from "react"
+import { useFormContext } from "react-hook-form"
 
+// fila 0 -> primera mitad (cuartos 1-2), termina al pasar a Q3
+// fila 1 -> segunda mitad (cuartos 3-4), termina al pasar a Q5 (overtime)
+// fila 2 -> tiempos extra, sin cierre automático por ahora
+const ROWS = [
+  { boxes: [1, 2], endsAtQuarter: 2 },
+  { boxes: [3, 4, 5], endsAtQuarter: 4 },
+  { boxes: [6, 7, 8], endsAtQuarter: null },
+]
 
-export default function TimeoutsGrid({ group, count, perRow = 3 }) {
-  const rows = Math.ceil(count / perRow)
+const colorForPeriod = (period) => {
+  if (period == 1 || period == 3){
+    return "text-red-600"
+  }else{
+    return "text-black"
+  }
+}
+
+export default function TimeoutsGrid({ group, quarter }) {
+  const { getValues, setValue } = useFormContext()
+  const prevQuarterRef = useRef(quarter)
+  const color = colorForPeriod(quarter)
+
+  useEffect(() => {
+    const prevQuarter = prevQuarterRef.current
+    if (quarter > prevQuarter) {
+      ROWS.forEach((row) => {
+        if (row.endsAtQuarter === prevQuarter) {
+          row.boxes.forEach((boxid) => {
+            const fieldName = `${group}.timeouts.${boxid}`
+            const current = getValues(fieldName)
+            if (current === undefined || current === "" || current === null) {
+              setValue(fieldName, "=")
+            }
+          })
+        }
+      })
+    }
+    prevQuarterRef.current = quarter
+  }, [quarter, group, getValues, setValue])
+
   return (
     <div className="flex flex-col gap-1">
-      {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="flex gap-1">
-          {Array.from({ length: perRow }).map((_, c) => {
-            const index = r * perRow + c
-            if (index >= count) return <div key={c} className="w-8 h-8" />
-            return <TimeoutBox key={c} group={group} index={index} />
-          })}
+      {ROWS.map((row) => (
+        <div key={group + String(row.boxes[0])} className="flex gap-1">
+          {row.boxes.map((boxid) => (
+            <TimeoutBox key={boxid} group={group} color={color} boxid={boxid} />
+          ))}
         </div>
       ))}
     </div>
