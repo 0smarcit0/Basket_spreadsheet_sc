@@ -22,7 +22,6 @@ export default function TimeoutBox({ group, color, boxid }) {
     } else if (!hasValue && lockedColor !== null) {
       setLockedColor(null)
     }
-    
   }, [field.value])
 
   const displayColor = lockedColor ?? color
@@ -31,7 +30,7 @@ export default function TimeoutBox({ group, color, boxid }) {
     let val = e.target.value
     if (val !== "=") {
       val = val.replace(/[^0-9]/g, "").slice(0, 2)
-      if (val !== "" && Number(val) > 40) val = "40"
+      if (val !== "" && Number(val) > 40) val = "1"
     }
     field.onChange(val === "" ? undefined : val)
   }
@@ -41,7 +40,10 @@ export default function TimeoutBox({ group, color, boxid }) {
       type="text"
       inputMode="numeric"
       maxLength={2}
-      className={`w-8 h-8 border-2 border-black text-center bg-transparent
+      className={`w-6.5 h-6 border-2 border-black box-border
+                  -mr-[2px] -mb-[2px]
+                  relative focus:z-10
+                  text-center bg-transparent
                   focus:outline-none focus:bg-yellow-50 leading-none ${displayColor}`}
       name={field.name}
       value={field.value ?? ""}

@@ -1,25 +1,19 @@
 "use client"
-import { useFormContext, useController } from "react-hook-form"
+import { useFormContext } from "react-hook-form"
 import FoulRow from "../form_components/FoulRow"
 import TimeoutsGrid from "../form_components/TimeoutsGrid"
-
-
-
-
+import RosterTable from "../form_components/RosterTable"
+import { useMatchStore } from "../../utils/store/matchStore"
 export default function TeamForm(props) {
   const { register } = useFormContext()
+  const quarter = useMatchStore((state) => state.quarter)
   const group = `team${props.team}`
   const foulsPerPeriod = 5
   const label = `Team ${props.team}`
-  console.log("he sido creado papu")
 
-
-  
   return (
     <div className="w-full font-sans text-sm font-bold text-gray-800 border border-black p-2">
-      <div>
-        {props.quarter}
-      </div>
+      <div>{quarter}</div>
       <div className="flex items-end mb-2">
         <label className="mr-1 whitespace-nowrap">{label}</label>
         <input
@@ -29,34 +23,36 @@ export default function TeamForm(props) {
         />
       </div>
 
+      
+
       <div className="flex gap-6">
-        <div>
-          <p className="mb-1">Time-outs</p>
-          <TimeoutsGrid group={group} quarter={props.quarter} />
+        <div className="pb-1">
+          <p className="mb-1 text-left" style={{fontSize:18}}>Time-outs</p>
+          <TimeoutsGrid group={group} />
         </div>
 
         <div>
           <p className="mb-1">Team fouls</p>
-
           <div className="flex items-center gap-2 mb-1">
             <span>Period ①</span>
-            <FoulRow group={group} period={1} count={foulsPerPeriod} quarter={props.quarter} color = "text-red-500"/>
+            <FoulRow group={group} period={1} count={foulsPerPeriod} color="text-red-500" />
             <span>②</span>
-            <FoulRow group={group} period={2} count={foulsPerPeriod} quarter={props.quarter} color = "text-black"/>
+            <FoulRow group={group} period={2} count={foulsPerPeriod} color="text-black" />
           </div>
-
           <div className="flex items-center gap-2 mb-1">
             <span>Period ③</span>
-            <FoulRow group={group} period={3} count={foulsPerPeriod} quarter={props.quarter} color = "text-red-500"/>
+            <FoulRow group={group} period={3} count={foulsPerPeriod}  color="text-red-500" />
             <span>④</span>
-            <FoulRow group={group} period={4} count={foulsPerPeriod} quarter={props.quarter} color = "text-black"/>
+            <FoulRow group={group} period={4} count={foulsPerPeriod}  color="text-black" />
           </div>
-
           <div className="flex items-center gap-2">
             <span>Extra periods</span>
             <div className="w-8 h-8" />
           </div>
         </div>
+      </div>
+      <div className="mb-3">
+        <RosterTable group={group}  />
       </div>
     </div>
   )
