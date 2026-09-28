@@ -37,18 +37,31 @@ export default function FormPlanilla() {
                     "
                 >
                     <HalftimeWatcher getValues={methods.getValues} groups={["teamA", "teamB"]} />
-
-                    <FormHeadInputs />
-                    <div className="flex flex-row"  style={{ gap: 16 }}>
-                        <div className="flex flex-col">
-                          <TeamForm team="A" />
-                          <TeamForm team="B" />
-                          <TableForm/>
-                        </div>
-                        <RunningScoreForm />
+                    <div className="w-[1061px]">
+                        <FormHeadInputs />
                     </div>
+
                     
-                   
+                    <div className="flex flex-row items-start w-[1050px] gap-[14px]">
+
+                        <div className="flex flex-col w-[500px] shrink-0">
+
+                            <div className="flex flex-col h-[1018px]">
+                                <div className="h-[509px]">
+                                    <TeamForm team="A" />
+                                </div>
+                                <div className="h-[509px]">
+                                    <TeamForm team="B" />
+                                </div>
+                            </div>
+
+                            <TableForm />
+                        </div>
+
+                        <div className="h-[1018px] w-[547px] shrink-0">
+                            <RunningScoreForm />
+                        </div>
+                    </div>
 
                     <div className="flex items-center" style={{ gap: 16, marginTop: 16 }}>
                         <input type="submit" value="Submit" className="cursor-pointer" />

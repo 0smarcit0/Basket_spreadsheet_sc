@@ -6,7 +6,7 @@ export default function FormHeadInputs() {
 
     return (
         <div className="w-full font-sans text-sm font-bold text-gray-800">
-            <div className="flex w-full gap-2 mb-1 px-1">
+            <div className="flex w-full gap-2 mb-1 px-1 border-b-0">
                 <div className="flex flex-1 items-end">
                     <label className="mr-1 whitespace-nowrap">Team A</label>
                     <input 
@@ -25,7 +25,7 @@ export default function FormHeadInputs() {
                 </div>
             </div>
 
-            <div className="border-2 border-black p-2 flex flex-col gap-3">
+            <div className="border-1 border-black p-2 flex flex-col gap-3">
                 <div className="flex w-full items-end gap-3">
                     <div className="flex items-end flex-[1.5]">
                         <label className="mr-1 whitespace-nowrap">Competition</label>
@@ -66,7 +66,7 @@ export default function FormHeadInputs() {
                         <label className="mr-1 whitespace-nowrap">Game No.</label>
                         <input 
                             type="text" 
-                            className="flex-1 border-b border-black bg-transparent focus:outline-none px-1" 
+                            className="flex-1 border-b border-black bg-transparent focus:outline-none px-1 w-[172px]" 
                             {...register("head.gameNo")} 
                         />
                     </div>
@@ -78,7 +78,7 @@ export default function FormHeadInputs() {
                             {...register("head.place")} 
                         />
                     </div>
-                    <div className="flex items-end flex-[1.5]">
+                    <div className="flex items-end flex-[2]">
                         <label className="mr-1 whitespace-nowrap">Umpire 1</label>
                         <input 
                             type="text" 
@@ -86,7 +86,7 @@ export default function FormHeadInputs() {
                             {...register("head.umpire1")} 
                         />
                     </div>
-                    <div className="flex items-end flex-[1.5]">
+                    <div className="flex items-end flex-[2]">
                         <label className="mr-1 whitespace-nowrap">Umpire 2</label>
                         <input 
                             type="text" 

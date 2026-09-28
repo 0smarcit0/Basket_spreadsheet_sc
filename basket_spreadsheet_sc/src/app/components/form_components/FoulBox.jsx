@@ -6,10 +6,10 @@ export default function FoulBox({ group, period, index, color }) {
   const quarter = useMatchStore((state) => state.quarter)
   const { control, setValue } = useFormContext()
   const name = `${group}.fouls.p${period}.${index}`
-  const classname ='w-8 h-8 border-2 border-black flex items-center justify-center bg-transparent focus:outline-none '+color
+  const classname ='w-7 h-6 border-2 border-black box-border  -mr-[2px] -mb-[2px]  relative focus:z-10 flex items-center justify-center bg-transparent focus:outline-none '+color
   const [val, setVal] = useState("x")
-
-
+                 
+                 
   const { field } = useController({
     name,
     control,

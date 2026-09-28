@@ -56,7 +56,7 @@ export function FoulCell({ name, types, isSecondHalf }) {
 
   return (
     <td
-      className={`relative border border-black p-0 text-center w-6 h-6 ${
+      className={`relative border border-black p-0 text-center w-6 h-1 ${
         isSecondHalf  && field.value!==""? "border-r-[6px] border-t-black" : ""
       }`}
     >

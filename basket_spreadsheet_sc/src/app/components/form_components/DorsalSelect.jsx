@@ -29,7 +29,7 @@ export default function DorsalSelect({ name, players = [] }) {
         >
             <select
                 defaultValue=""
-                className="w-full h-full bg-transparent text-[11px] text-center focus:outline-none"
+                className="block w-full h-full appearance-none border-0 rounded-none bg-transparent text-[11px] text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                 {...register(`${name}.dorsal`)}
             >
                 <option value=""></option>

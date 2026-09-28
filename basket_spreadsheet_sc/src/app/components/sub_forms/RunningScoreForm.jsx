@@ -2,7 +2,9 @@ import ScoreColumn from "../form_components/ScoreColumn"
 export default function RunningScoreForm() {
     return(
      <div>
-        <div>Running Score</div>
+        <div >
+            <p className="text-center font-bold border-r border-l" style={{fontSize:20}}>Running Score</p>
+        </div>
         <div className="flex flex-row border border-b-2">
             <div className="flex flex-row " >
                 <ScoreColumn team="A" range={[1,40]} />

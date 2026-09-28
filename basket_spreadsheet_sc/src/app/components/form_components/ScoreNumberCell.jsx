@@ -3,7 +3,7 @@ import { useFormContext } from "react-hook-form";
 
 // Medidas fijas en px, consistentes con el resto de la planilla.
 export const NUMBER_CELL_WIDTH = 28 // px
-export const ROW_HEIGHT = 18 // px
+export const ROW_HEIGHT = 24 // px
 
 /**
  * Celda "número impreso" del running score.
@@ -25,7 +25,7 @@ export default function ScoreNumberCell({ name, value }) {
     return (
         <td
             className="border border-black p-0 text-center relative"
-            style={{ width: NUMBER_CELL_WIDTH, height: ROW_HEIGHT }}
+            style={{ width: NUMBER_CELL_WIDTH, height: ROW_HEIGHT}}
         >
             {/*
               Checkbox real, funcional, pero invisible: cubre toda la celda

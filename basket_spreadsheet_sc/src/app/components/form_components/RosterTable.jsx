@@ -36,25 +36,52 @@ export default function RosterTable({ group, quarter }) {
         ))}
 
         <tr>
-          <td colSpan={6} className="border border-black px-1 py-0.5 text-left font-bold">
-            <label className="mr-1 whitespace-nowrap">Coach</label>
-            <input
-              type="text"
-              className="flex-1 bg-transparent focus:outline-none px-1 leading-tight w-89%"
-              {...register(`${group}.coachName`)}
-            />
+          <td colSpan={6} className="border border-black text-left font-bold p-0">
+            <div className="flex items-stretch h-[24px]">
+              <label className="mr-1 ml-1 whitespace-nowrap flex items-center shrink-0 w-[115px]">
+                Head coach
+              </label>
+              <input
+                type="text"
+                className="w-[40px] shrink-0 m-0 py-0 px-1 bg-transparent
+                border-0 border-x border-black
+                focus:outline-none leading-tight"
+                {...register(`${group}.coachAditionalInput`)}
+              />
+              <input
+                type="text"
+                className="flex-1 min-w-0 m-0 py-0 px-1 bg-transparent
+                   border-0 focus:outline-none leading-tight"
+                {...register(`${group}.coachName`)}
+              />
+            </div>
+            
           </td>
           <CoachFoulsCells group={group} role="coach" />
         </tr>
         <tr>
-          <td colSpan={6} className="border border-black px-1 py-0.5 text-left font-bold">
-            <label className="mr-1 whitespace-nowrap">Assistant Coach</label>
+         <td colSpan={6} className="border border-black text-left font-bold p-0">
+          <div className="flex items-stretch h-[24px]">
+            <label className="mr-1 ml-1 whitespace-nowrap flex items-center shrink-0 w-[115px]">
+             First assistant Coach
+            </label>
+
             <input
               type="text"
-              className="flex-1 bg-transparent focus:outline-none px-1 leading-tight w-89%"
+              className="w-[40px] shrink-0 m-0 py-0 px-1 bg-transparent
+                border-0 border-x border-black
+                focus:outline-none leading-tight"
+              {...register(`${group}.assistantCoachAditionalInput`)}
+            />
+
+            <input
+              type="text"
+              className="flex-1 min-w-0 m-0 py-0 px-1 bg-transparent
+                   border-0 focus:outline-none leading-tight"
               {...register(`${group}.assistantCoachName`)}
             />
-          </td>
+          </div>
+         </td>
           <CoachFoulsCells group={group} role="assistantCoach" />
         </tr>
       </tbody>

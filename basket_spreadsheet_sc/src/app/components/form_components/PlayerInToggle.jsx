@@ -74,7 +74,7 @@ export default function PlayerInToggle({ group, index }) {
   }
 
   return (
-    <div ref={ref} className="relative w-6 h-6 mx-auto">
+    <div ref={ref} className="relative w-6 h-5.5 mx-auto">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

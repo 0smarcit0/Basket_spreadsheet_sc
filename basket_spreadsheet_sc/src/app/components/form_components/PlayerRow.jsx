@@ -40,7 +40,7 @@ export default function PlayerRow({ group, index, totalRows }) {
   }
 
   return (
-    <tr>
+    <tr className="">
       <td className="border border-black p-0">
         <input
           type="text"
