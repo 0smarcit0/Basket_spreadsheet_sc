@@ -1,7 +1,7 @@
 "use client"
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useController} from "react-hook-form";
 import { ROW_HEIGHT } from "./ScoreNumberCell";
-
+import { useState, useEffect } from "react";
 export const SELECT_CELL_WIDTH = 40 // px
 
 /**
@@ -19,9 +19,28 @@ export const SELECT_CELL_WIDTH = 40 // px
  * @param {string} name - path base del campo, ej: "runningScore.A.15"
  * @param {{number: string|number, name?: string}[]} [players] - opciones disponibles
  */
-export default function DorsalSelect({ name, players = [] }) {
-    const { register } = useFormContext();
 
+
+export default function DorsalSelect({ gname, players = [], color, handleChange }) {
+    const { register, control } = useFormContext();
+    
+    const [lockedColor, setLockedColor] = useState(null)
+    const name =`${gname}.dorsal`
+    const { field } = useController({
+        name,
+        control
+      })
+    useEffect(() => {
+        const hasValue = field.value !== undefined && field.value !== "" && field.value !== null
+        if (hasValue && lockedColor === null) {
+          setLockedColor(field.value === "=" ? "text-black" : color)
+        } else if (!hasValue && lockedColor !== null) {
+          setLockedColor(null)
+        }
+    }, [field.value])
+    
+    const displayColor = lockedColor ?? color
+    
     return (
         <td
             className="border border-black p-0"
@@ -29,14 +48,15 @@ export default function DorsalSelect({ name, players = [] }) {
         >
             <select
                 defaultValue=""
-                className="block w-full h-full appearance-none border-0 rounded-none bg-transparent text-[11px] text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-                {...register(`${name}.dorsal`)}
+                className={`block w-full h-full appearance-none border-0 rounded-none bg-transparent text-[11px] text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500  ${displayColor}`}
+                {...register(name)}
+                onChange={handleChange(name)}
             >
                 <option value=""></option>
 
                 {players.map((player) => (
-                    <option key={player.number} value={player.number}>
-                        {player.number}
+                    <option key={player.number} value={player.number} >
+                        {`${player.number}, ${player.name}` }
                     </option>
                 ))}
             </select>

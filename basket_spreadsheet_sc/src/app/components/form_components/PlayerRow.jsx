@@ -58,6 +58,7 @@ export default function PlayerRow({ group, index, totalRows }) {
             className="flex-1 bg-transparent px-1 py-0.5 focus:outline-none"
             onClick={handleNameClick}
             
+            
             style={{ touchAction: "manipulation" }}
             title="Doble click / doble tap para asignar capitán"
             {...register(`${base}.name`)}

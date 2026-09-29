@@ -1,19 +1,9 @@
 "use client"
+import { memo, useCallback } from "react";
 import DorsalSelect from "./DorsalSelect";
 import ScoreNumberCell from "./ScoreNumberCell";
-
+import { useMatchStore } from "../../utils/store/matchStore";
 /**
- * Una fila del running score: el par de celdas (select de dorsal + número
- * de puntaje) para UN valor puntual, ya ordenadas según el equipo.
- *
- * Criterio de orden (a discreción, documentado para que se pueda ajustar):
- * - Equipo A: select primero (izquierda), número después (derecha).
- * - Equipo B: número primero (izquierda), select después (derecha).
- *
- * Esto hace que al renderizar <ScoreColumn team="A" /> seguido de
- * <ScoreColumn team="B" /> una al lado de la otra, los números impresos
- * queden juntos "al centro" y los selects hacia afuera, tal como en el
- * PDF oficial.
  * 
  *
  * @param {"A"|"B"} team
@@ -21,9 +11,26 @@ import ScoreNumberCell from "./ScoreNumberCell";
  * @param {string} name   - path base del campo, ej: "runningScore.A.15"
  * @param {Array}  [players] - opciones para el select de dorsal
  */
+const colorForPeriod = (period) => {
+  if (period == 1 || period == 3){
+    return "text-red-600"
+  }else{
+    return "text-black"
+  }
+}
 export default function ScoreRow({ team, value, name, players }) {
-    const numberCell = <ScoreNumberCell key="number" name={name} value={value} />
-    const selectCell = <DorsalSelect key="select" name={name} players={players} />
+    const handleNumberChange = (name)=>{
+      /*if (team==="A") {
+        const change = useMatchStore((state)=>state.increaseTeamAscore(value, name))
+      }else{
+        const change = useMatchStore((state)=>state.increaseTeamBscore(value, name))
+      }*/
+      console.log("hola")
+    }
+    const quarter = useMatchStore((state) => state.quarter)
+    const color = colorForPeriod(quarter)
+    const numberCell = <ScoreNumberCell key="number" name={name} value={value}  />
+    const selectCell = <DorsalSelect key="select" gname={name} players={players} color={color} handleChange={handleNumberChange}  />
 
     const cells = team === "A" ? [selectCell, numberCell] : [numberCell, selectCell]
 

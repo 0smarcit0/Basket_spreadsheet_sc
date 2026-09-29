@@ -3,10 +3,8 @@ import { useFormContext } from "react-hook-form"
 import FoulRow from "../form_components/FoulRow"
 import TimeoutsGrid from "../form_components/TimeoutsGrid"
 import RosterTable from "../form_components/RosterTable"
-import { useMatchStore } from "../../utils/store/matchStore"
 export default function TeamForm(props) {
   const { register } = useFormContext()
-  const quarter = useMatchStore((state) => state.quarter)
   const group = `team${props.team}`
   const foulsPerPeriod = 4
   const label = `Team ${props.team}`
