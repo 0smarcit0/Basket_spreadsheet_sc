@@ -18,14 +18,14 @@ const colorForPeriod = (period) => {
     return "text-black"
   }
 }
-export default function ScoreRow({ team, value, name, players }) {
+function ScoreRow({ team, value, name, players }) {
     const handleNumberChange = (name)=>{
       /*if (team==="A") {
         const change = useMatchStore((state)=>state.increaseTeamAscore(value, name))
       }else{
         const change = useMatchStore((state)=>state.increaseTeamBscore(value, name))
       }*/
-      console.log("hola")
+      console.log("hola soy del "+team+" "+value)
     }
     const quarter = useMatchStore((state) => state.quarter)
     const color = colorForPeriod(quarter)
@@ -36,3 +36,4 @@ export default function ScoreRow({ team, value, name, players }) {
 
     return <tr>{cells}</tr>
 }
+export default memo(ScoreRow)
