@@ -1,8 +1,8 @@
 import { create } from "zustand"
 
 export const useMatchStore = create((set, get) => ({
-  quarter: 1,
-  previousQuarter: 1,
+  quarter: 0,
+  previousQuarter: 0,
   halftimeCaptured: false,
   gameEnded: false,
   teamAcurrentScore: 0,
