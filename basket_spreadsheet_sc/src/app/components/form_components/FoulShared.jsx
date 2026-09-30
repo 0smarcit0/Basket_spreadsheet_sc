@@ -1,5 +1,5 @@
 "use client"
-import { useController } from "react-hook-form"
+import { useController, useFormContext } from "react-hook-form"
 import { useState, useRef, useEffect } from "react"
 import { useMatchStore } from "../../utils/store/matchStore"
 
@@ -32,11 +32,40 @@ export function FoulLabel({ type, color, types, size = "text-xs" }) {
 }
 
 // Celda de foul genérica: recibe el nombre completo del campo RHF y el set de tipos
-export function FoulCell({ name, types, isSecondHalf }) {
+export function FoulCell({ name, types, neighbors = {}, rowNames = [] }) {
+  const gameEnded = useMatchStore((state) => state.gameEnded)
+  const { getValues } = useFormContext()
   const quarter = useMatchStore((state) => state.quarter)
+  const secondHalfStarted = useMatchStore((state) => state.halftimeCaptured)
   const { field } = useController({ name, defaultValue: "" })
   const [open, setOpen] = useState(false)
+  const [frozenLines, setFrozenLines] = useState("") // bordes congelados al medio tiempo
   const ref = useRef(null)
+
+  // Foto del estado en el momento en que termina la primera mitad
+  useEffect(() => {
+    if (!secondHalfStarted) {
+      setFrozenLines("")
+      return
+    }
+    const used = (n) => !!getValues(n)
+    const self = used(name)
+    const { left, right, top, bottom } = neighbors
+    const lines = []
+
+    // Frontera entre celda usada y no usada: ambas celdas dibujan el borde
+    if (left && used(left) !== self) lines.push("border-l-[6px]")
+    if (right && used(right) !== self) lines.push("border-r-[6px]")
+    if (top && used(top) !== self) lines.push("border-t-[6px]")
+    if (bottom && used(bottom) !== self) lines.push("border-b-[6px]")
+
+    // Fila completamente vacía: borde izquierdo en su primera celda
+    if (rowNames.length > 0 && rowNames.every((n) => !used(n))) {
+      lines.push("border-l-[6px]")
+    }
+
+    setFrozenLines([...new Set(lines)].join(" "))
+  }, [secondHalfStarted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -55,18 +84,18 @@ export function FoulCell({ name, types, isSecondHalf }) {
   }
 
   return (
-    <td
-      className={`relative border border-black p-0 text-center w-6 h-1 ${
-        isSecondHalf  && field.value!==""? "border-r-[6px] border-t-black" : ""
-      }`}
-    >
+    <td className={`relative border border-black p-0 text-center w-6 h-1 ${frozenLines}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full h-full flex items-center justify-center"
+        disabled = {gameEnded}
       >
         <FoulLabel type={currentType} color={currentColor} types={types} />
       </button>
+      {gameEnded && !field.value && (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-black" />
+      )}
 
       {open && (
         <div

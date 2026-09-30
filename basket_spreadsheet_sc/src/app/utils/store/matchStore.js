@@ -74,6 +74,8 @@ export const useMatchStore = create((set, get) => ({
         state.quarter > 0 && q > state.quarter
           ? markLastScored(state, state.quarter)
           : state.endMarks,
+      halftimeCaptured:
+        state.halftimeCaptured || (state.quarter === 2 && q === 3),
     })),
 
   endGame: () =>

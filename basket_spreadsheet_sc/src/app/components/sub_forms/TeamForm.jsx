@@ -3,6 +3,8 @@ import { useFormContext } from "react-hook-form"
 import FoulRow from "../form_components/FoulRow"
 import TimeoutsGrid from "../form_components/TimeoutsGrid"
 import RosterTable from "../form_components/RosterTable"
+import HccCells from "../form_components/HccCells"
+
 export default function TeamForm(props) {
   const { register } = useFormContext()
   const group = `team${props.team}`
@@ -32,27 +34,27 @@ export default function TeamForm(props) {
           <p className=" pr-1 pl-1 text-center" style={{fontSize:18}}>Team fouls</p>
           <div className="flex items-center gap-2 h-5.5">
             <div>
-              <span>Quarter</span>
-              <span style={{fontSize:22}}> ①</span>
+              
+              <span style={{fontSize:16}}> Q1</span>
             </div>
             
             <FoulRow group={group} period={1} count={foulsPerPeriod} color="text-red-500" />
-            <span style={{fontSize:22}}> ②</span>
+            <span style={{fontSize:16}}> Q2</span>
             <FoulRow group={group} period={2} count={foulsPerPeriod} color="text-black" />
           </div>
           <div className="flex items-center gap-2 h-5.6">
             
             <div>
-              <span>Quarter</span>
-              <span style={{fontSize:22}}> ③</span>
+              
+              <span style={{fontSize:16}}> Q3</span>
             </div>
             <FoulRow group={group} period={3} count={foulsPerPeriod}  color="text-red-500" />
-            <span style={{fontSize:22}}> ④</span>
+            <span style={{fontSize:16}}> Q4</span>
             <FoulRow group={group} period={4} count={foulsPerPeriod}  color="text-black" />
           </div>
-          <div className="flex items-center gap-2">
-            <span>Overtimes</span>
-            <div className="w-8 h-8" />
+          <div className="flex items-center gap-2 ml-7">
+            <span style={{fontSize:16}}>HCC</span>
+            <HccCells name={`${group}.hcc`} />
           </div>
         </div>
       </div>

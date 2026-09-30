@@ -1,5 +1,5 @@
 "use client"
-import { useMatchStore } from "../../utils/store/matchStore"
+import { useMemo } from "react"
 import { FoulCell } from "./FoulShared"
 
 const PLAYER_FOUL_TYPES = [
@@ -13,18 +13,33 @@ const PLAYER_FOUL_TYPES = [
   { value: "GD", label: "GD", sup: null },
 ]
 
+const FOULS_PER_PLAYER = 5
+const PLAYERS_COUNT = 12 // ajusta al número de filas de tu planilla
+
 export default function FoulsCells({ group, index }) {
-  const playerKey = `${group}-${index}`
-  const boundary = useMatchStore((state) => state.halftimeBoundaries[playerKey])
+  const cell = (i, f) => `${group}.players.${i}.fouls.${f}`
+  
+
+  // Nombres de las 5 celdas de esta fila (solo los usa la primera celda)
+  const rowNames = useMemo(
+    () => Array.from({ length: FOULS_PER_PLAYER }, (_, k) => cell(index, k + 1)),
+    [group, index]
+  )
 
   return (
     <>
-      {[1, 2, 3, 4, 5].map((f) => (
+      {Array.from({ length: FOULS_PER_PLAYER }, (_, k) => k + 1).map((f) => (
         <FoulCell
           key={f}
-          name={`${group}.players.${index}.fouls.${f}`}
+          name={cell(index, f)}
           types={PLAYER_FOUL_TYPES}
-          isSecondHalf={boundary !== undefined && f === boundary}
+          rowNames={f === 1 ? rowNames : undefined}
+          neighbors={{
+            left: f > 1 ? cell(index, f - 1) : null,
+            right: f < FOULS_PER_PLAYER ? cell(index, f + 1) : null,
+            top: index > 0 ? cell(index - 1, f) : null,
+            bottom: index < PLAYERS_COUNT - 1 ? cell(index + 1, f) : null,
+          }}
         />
       ))}
     </>
