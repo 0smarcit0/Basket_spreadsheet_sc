@@ -8,8 +8,16 @@ import { useMatchStore } from "../../utils/store/matchStore";
 export const colorForPeriod = (period) =>
   period == 1 || period == 3 ? "text-red-600" : "text-black";
 
+// Mismo criterio que colorForPeriod, pero en hex para usarlo en border-color
+const hexForPeriod = (period) =>
+  period == 1 || period == 3 ? "#dc2626" : "#000000";
+
 function ScoreRow({ team, value, name, players }) {
   const { setValue, getValues } = useFormContext();
+
+  // Selectores primitivos: solo re-renderiza la fila cuyo valor cambia
+  const endMark = useMatchStore((s) => s.endMarks[team][value]); // cuarto que cerró esta fila, o undefined
+  const isFinal = useMatchStore((s) => s.finalRow[team] === value);
 
   const handleNumberChange = useCallback((dorsalName, dorsalValue, previousDorsal) => {
     const state = useMatchStore.getState();
@@ -19,11 +27,18 @@ function ScoreRow({ team, value, name, players }) {
 
     // 1) El usuario borró el select
     if (!dorsalValue) {
-      if (!previousPoints) return; // la fila no tenía anotación
+      if (!previousPoints) return;
+
+      // Una fila que cerró un cuarto queda bloqueada
+      if (state.endMarks[team][value] !== undefined) {
+        setValue(dorsalName, previousDorsal);
+        alert("Esta anotación cerró un cuarto y no se puede borrar.");
+        return;
+      }
 
       // Solo se puede borrar la última anotación del equipo
       if (value !== currentScore) {
-        setValue(dorsalName, previousDorsal); // restauramos el dorsal
+        setValue(dorsalName, previousDorsal);
         alert(`Solo puedes borrar la última anotación (${currentScore}). Borra primero las posteriores.`);
         return;
       }
@@ -34,11 +49,10 @@ function ScoreRow({ team, value, name, players }) {
       return;
     }
 
-    // 2) La fila ya tenía anotación y solo cambió de jugador:
-    //    se conservan points/period y NO se suma otra vez
+    // 2) Cambio de jugador en una fila ya anotada
     if (previousPoints) return;
 
-    // 3) Anotación nueva: validamos la diferencia contra el marcador actual
+    // 3) Anotación nueva
     const diff = value - currentScore;
 
     if (diff < 1 || diff > 3) {
@@ -56,7 +70,14 @@ function ScoreRow({ team, value, name, players }) {
   const quarter = useMatchStore((state) => state.quarter);
   const color = colorForPeriod(quarter);
 
-  const numberCell = <ScoreNumberCell key="number" name={name} value={value} />;
+  // Final del partido: 2 líneas negras gruesas. Fin de cuarto: línea gruesa del color del cuarto.
+  const rowStyle = isFinal
+    ? { borderBottom: "6px double #000000" } // "double" necesita >= 3px para verse como 2 líneas
+    : endMark !== undefined
+      ? { borderBottom: `3px solid ${hexForPeriod(endMark)}` }
+      : undefined;
+
+  const numberCell = <ScoreNumberCell key="number" name={name} value={value} endMark={endMark} />;
   const selectCell = (
     <DorsalSelect
       key="select"
@@ -67,7 +88,11 @@ function ScoreRow({ team, value, name, players }) {
     />
   );
 
-  return <tr>{team === "A" ? [selectCell, numberCell] : [numberCell, selectCell]}</tr>;
+  return (
+    <tr style={rowStyle}>
+      {team === "A" ? [selectCell, numberCell] : [numberCell, selectCell]}
+    </tr>
+  );
 }
 
 export default memo(ScoreRow);

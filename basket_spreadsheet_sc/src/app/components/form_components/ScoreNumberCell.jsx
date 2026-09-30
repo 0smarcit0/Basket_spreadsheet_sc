@@ -5,7 +5,7 @@ import { colorForPeriod } from "./ScoreRow";
 export const NUMBER_CELL_WIDTH = 28 // px
 export const ROW_HEIGHT = 24 // px
 
-export default function ScoreNumberCell({ name, value }) {
+export default function ScoreNumberCell({ name, value, endMark }) {
     const { control } = useFormContext();
 
     const [points, period] = useWatch({
@@ -36,6 +36,9 @@ export default function ScoreNumberCell({ name, value }) {
                 <span className={`pointer-events-none absolute inset-0 flex items-center justify-center ${markColor}`}>
                     <span className="block w-[9px] h-[9px] rounded-full bg-current" />
                 </span>
+            )}
+            {endMark !== undefined && (
+                <span className={`pointer-events-none absolute inset-0 m-auto w-[20px] h-[20px] rounded-full border-2 border-current ${colorForPeriod(endMark)}`} />
             )}
         </td>
     )
