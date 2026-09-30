@@ -20,16 +20,30 @@ const QUARTERS = [
 
 export default function FormPlanilla() {
     const methods = useForm();
-    // Asegúrate de extraer setQuarter (o la función equivalente) de tu store
     const quarter = useMatchStore((state) => state.quarter)
     const setQuarter = useMatchStore((state) => state.setQuarter) 
-    
+    const teamAlastCell = useMatchStore((state)=>state.numberCellNameA)
+    const teamAscore = useMatchStore((state)=>state.teamAcurrentScore)
+    const teamBlastCell = useMatchStore((state)=>state.numberCellNameB)
+    const teamBscore = useMatchStore((state)=>state.teamBcurrentScore)
     const onSubmit = (data) => {
         alert(JSON.stringify(data))
     }
 
     return (
         <div className="h-full w-full overflow-auto bg-gray-100 dark:bg-gray-900">
+            <div>
+                {teamAlastCell}
+            </div>
+            <div>
+                {teamBlastCell}
+            </div>
+            <div>
+                {teamAscore}
+            </div>
+            <div>
+                {teamBscore}
+            </div>
             <div className="flex items-center justify-between w-[1050px] mt-4">
                         <input 
                             type="submit" 
@@ -46,7 +60,7 @@ export default function FormPlanilla() {
                                     className={`
                                         px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200
                                         ${quarter === q.id 
-                                            ? 'bg-white text-gray-900 shadow-sm' // Estilo para el cuarto seleccionado[cite: 1]
+                                            ? 'bg-white text-gray-900 shadow-sm' 
                                             : 'text-gray-600 dark:text-gray-300 hover:text-gray-800' // Estilo para los cuartos inactivos con fondo gris[cite: 1]
                                         }
                                     `}

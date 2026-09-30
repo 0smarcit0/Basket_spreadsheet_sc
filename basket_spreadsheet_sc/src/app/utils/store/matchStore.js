@@ -11,18 +11,42 @@ export const useMatchStore = create((set, get) => ({
   ScoreCellNameA: "",
   numberCellNameB: "",
   ScoreCellNameB: "",
+  scoredStackA: [],
+  scoredStackB: [],
 
-
-  increaseTeamAscore:(value, cellName)=>set((state)=>({
+  increaseTeamAscore: (value, cellName) => set((state) => {
+    const newScore = state.teamAcurrentScore + value;
+    return {
       numberCellNameA: cellName,
       ScoreCellNameA: cellName,
-      teamAcurrentScore: state.teamAcurrentScore+value
-  })),
-  increaseTeamBscore:(value, cellName)=>set((state)=>({
+      teamAcurrentScore: newScore,
+      scoredStackA: [...state.scoredStackA, newScore],
+    };
+  }),
+  increaseTeamBscore: (value, cellName) => set((state) => {
+    const newScore = state.teamBcurrentScore + value;
+    return {
       numberCellNameB: cellName,
       ScoreCellNameB: cellName,
-      teamBcurrentScore: state.teamBcurrentScore+value
-  })),
+      teamBcurrentScore: newScore,
+      scoredStackB: [...state.scoredStackB, newScore],
+    };
+  }),
+
+  undoTeamAscore: () => set((state) => {
+    const stack = state.scoredStackA.slice(0, -1);
+    return {
+      scoredStackA: stack,
+      teamAcurrentScore: stack.length ? stack[stack.length - 1] : 0,
+    };
+  }),
+  undoTeamBscore: () => set((state) => {
+    const stack = state.scoredStackB.slice(0, -1);
+    return {
+      scoredStackB: stack,
+      teamBcurrentScore: stack.length ? stack[stack.length - 1] : 0,
+    };
+  }),
   increaseQuarter: ()=>
     set((state)=>({
       previousQuarter: state.quarter,
