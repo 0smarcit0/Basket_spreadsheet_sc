@@ -18,6 +18,7 @@ const FOCUSABLE =
  * @param {Function}  onClose
  * @param {string}    [title]
  * @param {ReactNode} children
+ * @param {ReactNode} [footer]            - zona de botones (se alinea a la derecha)
  * @param {"sm"|"md"|"lg"|"xl"} [size]
  * @param {boolean}   [closeOnOverlay]    - cerrar al tocar fuera (default true)
  * @param {boolean}   [closeOnEsc]        - cerrar con Esc (default true)
@@ -28,6 +29,7 @@ export default function Modal({
   onClose,
   title,
   children,
+  footer,
   size = "md",
   closeOnOverlay = true,
   closeOnEsc = true,
@@ -129,7 +131,11 @@ export default function Modal({
 
         <div className="overflow-y-auto px-5 py-4">{children}</div>
 
-
+        {footer && (
+          <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

@@ -1,11 +1,8 @@
 "use client"
 import { useMemo } from "react"
 import { FoulCell } from "./FoulShared"
+import { COACH_FOUL_CATEGORIES } from "../../utils/foulTypes" // ajusta la ruta
 
-const COACH_FOUL_TYPES = [
-  { value: "C", label: "C" },
-  { value: "B", label: "B" },
-]
 
 const FOULS_COUNT = 3
 
@@ -23,7 +20,7 @@ export default function CoachFoulsCells({ group, role, aboveRole = null, belowRo
         <FoulCell
           key={f}
           name={cell(role, f)}
-          types={COACH_FOUL_TYPES}
+          types={COACH_FOUL_CATEGORIES}
           rowNames={f === 1 ? rowNames : undefined}
           neighbors={{
             left: f > 1 ? cell(role, f - 1) : null,
