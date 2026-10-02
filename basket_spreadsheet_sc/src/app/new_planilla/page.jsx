@@ -10,6 +10,7 @@ import HalftimeWatcher from "../components/form_components/HalfTimeWatcher";
 import ScoresForm from "../components/sub_forms/ScoreForm";
 import { useMatchStore } from "../utils/store/matchStore";
 import Link from "next/link"
+import { generateHalftimeReport } from "../utils/halfTimeReport" // ajusta la ruta
 import { ArrowLeft } from "lucide-react"
 
 
@@ -98,6 +99,14 @@ export default function FormPlanilla() {
                             >
                                 {gameEnded ? "Partido terminado" : "Terminar partido"}
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => generateHalftimeReport(methods.getValues())}
+                                disabled={quarter < 2}
+                                className="cursor-pointer rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Reporte mitad
+                            </button>
                         </div>
 
                         {/* Centro: marcador en vivo (datos de depuración, bórralos si no los necesitas) */}
@@ -112,20 +121,30 @@ export default function FormPlanilla() {
 
                         {/* Derecha: selector de cuarto */}
                         <div className="flex rounded-lg bg-gray-300 p-1 dark:bg-gray-700">
-                            {QUARTERS.map((q) => (
-                                <button
-                                    key={q.id}
-                                    type="button"
-                                    onClick={() => setQuarter(q.id)}
-                                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
-                                        quarter === q.id
+                            {QUARTERS.map((q) => {
+                                const isLocked = q.id < quarter || gameEnded
+                                const isActive = quarter === q.id
+
+                                return (
+                                    <button
+                                        key={q.id}
+                                        type="button"
+                                        disabled={isLocked}
+                                        onClick={() => setQuarter(q.id)}
+                                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
+                                            isActive
                                             ? "bg-white text-gray-900 shadow-sm"
                                             : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
-                                    }`}
-                                >
-                                    {q.label}
-                                </button>
-                            ))}
+                                            } ${
+                                            isLocked && !isActive
+                                            ? "cursor-not-allowed opacity-40 hover:text-gray-600"
+                                            : ""
+                                        }`}
+                                    >
+                                        {q.label}
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>

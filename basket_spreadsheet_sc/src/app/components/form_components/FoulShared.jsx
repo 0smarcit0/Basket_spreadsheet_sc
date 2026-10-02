@@ -26,7 +26,7 @@ export function FoulLabel({ type, color, types, size = "text-xs" }) {
   return (
     <span className={`${size} font-bold leading-none ${colorClass}`}>
       {option.label}
-      {option.sup && <sup className="text-[9px]">{option.sup}</sup>}
+      {option.sup && <sub className="text-[9px]">{option.sup}</sub>}
     </span>
   )
 }
@@ -100,7 +100,7 @@ export function FoulCell({ name, types, neighbors = {}, rowNames = [] }) {
       {open && (
         <div
           ref={ref}
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-gray-300 rounded shadow-md z-20 grid grid-cols-2 gap-0.5 p-1"
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-gray-300 rounded shadow-md z-20 flex flex-col gap-0.5 p-1"
         >
           {types.map((opt) => (
             <button
