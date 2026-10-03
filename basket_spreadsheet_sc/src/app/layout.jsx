@@ -9,6 +9,7 @@ export const constviewport= {
         maximumScale: 5,
         userScalable: true,
     } 
+    
 export default function RootLayout({ children }) {
     return (
         <html lang="es" className="h-full">
