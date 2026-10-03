@@ -66,13 +66,11 @@ export default function FormPlanilla() {
             <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
 
             <div className="flex-1 overflow-auto">
-                {/* Barra de herramientas: fija arriba al hacer scroll */}
                 <div className="sticky top-0 z-30 border-b border-gray-200 bg-gray-100/95 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
                     <div
                         className="mx-auto flex items-center justify-between gap-4"
                         style={{ width: SHEET_WIDTH }}
                     >
-                        {/* Izquierda: acciones */}
                         <div className="flex items-center gap-3">
                             <Link
                                 href="/"
@@ -102,14 +100,13 @@ export default function FormPlanilla() {
                             <button
                                 type="button"
                                 onClick={() => generateHalftimeReport(methods.getValues())}
-                                disabled={quarter < 2}
+                                disabled={quarter <= 2}
                                 className="cursor-pointer rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Reporte mitad
                             </button>
                         </div>
 
-                        {/* Centro: marcador en vivo (datos de depuración, bórralos si no los necesitas) */}
                         <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
                             <span>
                                 <b>A:</b> {teamAscore} <span className="opacity-60">({teamAlastCell || "—"})</span>
@@ -119,7 +116,6 @@ export default function FormPlanilla() {
                             </span>
                         </div>
 
-                        {/* Derecha: selector de cuarto */}
                         <div className="flex rounded-lg bg-gray-300 p-1 dark:bg-gray-700">
                             {QUARTERS.map((q) => {
                                 const isLocked = q.id < quarter || gameEnded

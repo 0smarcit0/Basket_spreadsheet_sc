@@ -24,6 +24,8 @@ export const useMatchStore = create((set, get) => ({
   scoredStackB: [],
   endMarks: { A: {}, B: {} }, 
   finalRow: { A: null, B: null },
+  halftimeBoundaries: {},
+
 
   increaseTeamAscore: (value, cellName) => set((state) => {
     const newScore = state.teamAcurrentScore + value;
@@ -87,7 +89,6 @@ export const useMatchStore = create((set, get) => ({
         B: state.teamBcurrentScore || null,
       },
     })),
-  halftimeBoundaries: {},
 
   captureHalftimeBoundary: (playerKey, filledCount) =>
     set((state) => ({

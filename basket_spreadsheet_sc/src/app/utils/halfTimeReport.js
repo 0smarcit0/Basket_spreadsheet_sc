@@ -74,7 +74,7 @@ export async function generateHalftimeReport(values) {
       theme: "grid",
       styles: { fontSize: 10, cellPadding: 4 },
       headStyles: { fillColor: [30, 64, 175], halign: "center" },
-      footStyles: { fillColor: [229, 231, 235], textColor: 0, fontStyle: "bold" },
+      footStyles: { fillColor: [229, 231, 235], textColor: 0, fontStyle: "bold", halign: "center" },
       columnStyles: {
         0: { halign: "center", cellWidth: 45 },
         1: { halign: "left" },
