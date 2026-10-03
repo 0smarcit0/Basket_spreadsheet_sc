@@ -1,36 +1,58 @@
 "use client"
 import { useFormContext, useController } from "react-hook-form"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useMatchStore } from "../../utils/store/matchStore"
+
 export default function FoulBox({ group, period, index, color }) {
-  const quarter = useMatchStore((state) => state.quarter)
+  // Selector booleano: solo re-renderiza cuando este período termina
+  const periodEnded = useMatchStore((state) => period < state.quarter)
   const { control, setValue } = useFormContext()
   const name = `${group}.fouls.p${period}.${index}`
-  const classname ='w-7 h-6 border-2 border-black box-border  -mr-[2px] -mb-[2px]  relative focus:z-10 flex items-center justify-center bg-transparent focus:outline-none '+color
-  const [val, setVal] = useState("x")
-                 
-                 
-  const { field } = useController({
-    name,
-    control,
-    defaultValue: false,
-  })
-  useEffect(()=>{
-    
-    if(period<quarter && !field.value){
-       setValue(name,!field.value)
-       setVal("=")
+
+  const { field } = useController({ name, control, defaultValue: "" })
+
+  // Al terminar el período, las celdas sin usar se anulan con "="
+  useEffect(() => {
+    if (periodEnded && !field.value) {
+      setValue(name, "=")
     }
-  }, [val, field,period, quarter, setVal])
+  }, [periodEnded, field.value, name, setValue])
+
+  const isFoul = field.value === "x" || field.value === true // true = datos antiguos
+  const isVoid = field.value === "="
 
   return (
     <button
       type="button"
-      aria-pressed={field.value}
-      onClick={() => field.onChange(!field.value)}
-      className={classname}
+      disabled={isVoid}
+      onClick={() => field.onChange(field.value ? "" : "x")}
+      className={`relative -mr-[2px] -mb-[2px] box-border h-6 w-6 border-2 border-black bg-transparent focus:z-10 focus:outline-none ${color}`}
     >
-      {field.value && val}
+      {(isFoul || isVoid) && (
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox="0 0 24 24"
+          preserveAspectRatio="none"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="butt"
+        >
+          {isFoul ? (
+            <>
+              {/* X de esquina a esquina */}
+              <line x1="0" y1="0" x2="24" y2="24" vectorEffect="non-scaling-stroke" />
+              <line x1="24" y1="0" x2="0" y2="24" vectorEffect="non-scaling-stroke" />
+            </>
+          ) : (
+            <>
+              {/* Dos líneas horizontales de lado a lado */}
+              <line x1="0" y1="8" x2="24" y2="8" vectorEffect="non-scaling-stroke" />
+              <line x1="0" y1="16" x2="24" y2="16" vectorEffect="non-scaling-stroke" />
+            </>
+          )}
+        </svg>
+      )}
     </button>
   )
 }

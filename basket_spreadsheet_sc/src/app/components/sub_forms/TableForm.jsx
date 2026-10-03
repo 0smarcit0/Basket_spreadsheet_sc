@@ -1,88 +1,64 @@
 "use client"
-import { useFormContext } from "react-hook-form";
+import { useFormContext } from "react-hook-form"
 
+const FONT = "'Arial Narrow', 'Liberation Sans Narrow', Arial, sans-serif"
 
-const BLOCK_WIDTH = 340 
-
-
-function Row({ label, name, register, label_width}) {
-    return (
-        <div className="flex items-baseline gap-0.5" style={{ height: 22 }}>
-            <span
-                className="font-bold text-[13px] leading-none shrink-0"
-                style={{ width: label_width }}
-            >
-                {label}
-            </span>
-            <input
-                type="text"
-                {...register(name)}
-                className="
-                    flex-1
-                    bg-transparent
-                    border-0 border-b border-black
-                    dark:border-white
-                    text-[13px]
-                    leading-none
-                    px-1
-                    focus:outline-none
-                "
-                style={{ height: 20 }}
-            />
-        </div>
-    )
+function Row({ label, name, register, labelWidth }) {
+  return (
+    <div className="flex flex-1 items-end gap-1">
+      <span
+        className="shrink-0 whitespace-nowrap text-[13px] font-bold leading-none"
+        style={{ width: labelWidth }}
+      >
+        {label}
+      </span>
+      <input
+        type="text"
+        {...register(name)}
+        className="h-[18px] min-w-0 flex-1 border-0 border-b border-black bg-transparent p-0 px-1 text-[13px] leading-none focus:outline-none"
+      />
+    </div>
+  )
 }
 
 export default function TableForm() {
-    const { register } = useFormContext();
+  const { register } = useFormContext()
 
-    return (
-        <div
-            className="w-full border border-black dark:border-white "
-        >
-            <div className="flex flex-col p-2" style={{ gap: 2 }}>
-                <Row label="Scorer" name="scorekeeper" register={register} label_width={170}/>
-                <Row label="Assistant Scorer" name="assistantScorekeeper" register={register} label_width={170}  />
-                <Row label="Timer" name="timekeeper" register={register} label_width={170} />
-                <Row label="Shot clock operator" name="operator24" register={register} label_width={170} />
-            </div>
+  return (
+    <div
+      className="w-[500px] shrink-0 border border-black text-black"
+      style={{ fontFamily: FONT }}
+    >
+      {/* SECCIÓN 1 (misma altura que Scores) */}
+      <div className="flex h-[126px] flex-col justify-between px-2 py-[10px]">
+        <Row label="Scorer" name="scorekeeper" register={register} labelWidth={150} />
+        <Row label="Assistant scorer" name="assistantScorekeeper" register={register} labelWidth={150} />
+        <Row label="Timer" name="timekeeper" register={register} labelWidth={150} />
+        <Row label="Shot clock operator" name="operator24" register={register} labelWidth={150} />
+      </div>
 
-            <div className="border-t border-black dark:border-white" />
-
-            <div className="flex flex-col p-2" style={{ gap: 2 }}>
-                <Row label="Crew Chief" name="referee" register={register}  label_width={70}/>
-                <div className="flex flex-row gap-6">
-                    <Row label="Umpire 1" name="umpire1" register={register} label_width={70}/>
-                    <Row label="Umpire 2" name="umpire2" register={register} label_width={70}/>
-                </div>
-                
-            </div>
-
-            <div className="border-t border-black dark:border-white" />
-
-            <div className="p-2">
-                <div className="flex items-baseline" style={{ height: 22 }}>
-                    <span className="font-bold text-[13px] leading-none shrink-0 whitespace-nowrap">
-                        Captain&apos;s signature in case of protest
-                    </span>
-                    <input
-                        type="text"
-                        {...register("captainSignature")}
-                        className="
-                            flex-1
-                            bg-transparent
-                            border-0 border-b border-black
-                            dark:border-white
-                            text-[13px]
-                            leading-none
-                            px-1
-                            ml-1
-                            focus:outline-none
-                        "
-                        style={{ height: 20 }}
-                    />
-                </div>
-            </div>
+      {/* SECCIÓN 2 (misma altura que Final Score) */}
+      <div className="flex h-[58px] flex-col justify-center gap-[10px] border-t border-black px-2">
+        <div className="flex h-[18px]">
+          <Row label="Crew Chief" name="referee" register={register} labelWidth={70} />
         </div>
-    )
+        <div className="flex h-[18px] gap-6">
+          <Row label="Umpire 1" name="umpire1" register={register} labelWidth={58} />
+          <Row label="Umpire 2" name="umpire2" register={register} labelWidth={58} />
+        </div>
+      </div>
+
+      {/* SECCIÓN 3 (misma altura que Game ended at) */}
+      <div className="flex h-[36px] items-end border-t border-black px-2 pb-[6px]">
+        <div className="flex h-[18px] w-full">
+          <Row
+            label="Captain's signature in case of protest"
+            name="captainSignature"
+            register={register}
+            labelWidth={215}
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
