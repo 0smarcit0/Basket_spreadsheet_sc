@@ -3,9 +3,7 @@ import TimeoutBox from "./TimeoutBox"
 import { useEffect, useRef } from "react"
 import { useFormContext } from "react-hook-form"
 import { useMatchStore } from "../../utils/store/matchStore"
-// fila 0 -> primera mitad (cuartos 1-2), termina al pasar a Q3
-// fila 1 -> segunda mitad (cuartos 3-4), termina al pasar a Q5 (overtime)
-// fila 2 -> tiempos extra, sin cierre automático por ahora
+
 const ROWS = [
   { boxes: [1, 2], endsAtQuarter: 2 },
   { boxes: [3, 4, 5], endsAtQuarter: 4 },

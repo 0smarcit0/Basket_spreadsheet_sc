@@ -26,7 +26,7 @@ export default function TableForm() {
 
   return (
     <div
-      className="w-[500px] shrink-0 border border-black text-black"
+      className="w-[47.25%] shrink-0 border border-black text-black"
       style={{ fontFamily: FONT }}
     >
       {/* SECCIÓN 1 (misma altura que Scores) */}

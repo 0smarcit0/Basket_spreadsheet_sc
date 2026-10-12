@@ -1,7 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useForm, FormProvider } from "react-hook-form"
-import Navbar from "../components/Navbar" // ajusta la ruta
 import FormHeadInputs from "../components/sub_forms/FormHeadInputs";
 import TeamForm from "../components/sub_forms/TeamForm";
 import TableForm from "../components/sub_forms/TableForm";
@@ -12,10 +11,10 @@ import { useMatchStore } from "../utils/store/matchStore";
 import Link from "next/link"
 import { generateHalftimeReport } from "../utils/halfTimeReport" // ajusta la ruta
 import { ArrowLeft } from "lucide-react"
+import Modal from "../components/Modal"
 
-
-const SHEET_WIDTH = 1200
-const SHEET_HEIGHT = 1600
+const SHEET_WIDTH = 1120
+const SHEET_HEIGHT = 1375
 
 const QUARTERS = [
     { id: 1, label: "1st" },
@@ -36,37 +35,68 @@ export default function FormPlanilla() {
     const teamBlastCell = useMatchStore((state) => state.numberCellNameB)
     const teamBscore = useMatchStore((state) => state.teamBcurrentScore)
 
-    // Tema (quita este bloque si ya lo manejas en otro lugar)
-    const [isDarkMode, setIsDarkMode] = useState(false)
-    useEffect(() => {
-        setIsDarkMode(document.documentElement.classList.contains("dark"))
-    }, [])
-    const toggleTheme = () => {
-        const next = !isDarkMode
-        document.documentElement.classList.toggle("dark", next)
-        setIsDarkMode(next)
-    }
+    const [modalTitle, setModalTitle] = useState("")
+    const [modalMessage, setModalMessage] = useState("")
+    const [modalFooter, setModalFooter] = useState(<></>)
+   
 
+    const [open, setOpen] = useState(false)
+    
+  
     const onSubmit = (data) => {
         alert(JSON.stringify(data))
     }
 
     const handleEndGame = () => {
         if (quarter === 0) {
-            alert("El partido aún no ha comenzado.")
+            setModalTitle("Advertencia")
+            setModalMessage("El partido aún no ha comenzado.")
+            setModalFooter(<></>)
+            setOpen(true)
             return
         }
-        if (window.confirm("¿Terminar el partido? Esta acción no se puede deshacer.")) {
-            endGame()
+        setModalTitle("Confirmación de finalización del partido")
+        setModalMessage("¿Está seguro que desea finalizar el partido? Una vez finalizado, no podrá realizar más cambios.")
+        setModalFooter((<button
+                            type="button"
+                            onClick={() => {endGame(); setOpen(false)}}
+                            className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+                        >
+                            Proceder
+                        </button>))
+        setOpen(true)
+        
+    }
+
+    const handleQuarterChange = (newQuarter) => {
+        if(quarter === 0 && newQuarter === 1) {
+            setModalTitle("Confirmación de inicio de partido")
+            setModalMessage("¿Está seguro que desea comenzar el partido? Una vez iniciado, no podrá agregar más jugadores.")
+            setModalFooter((<button
+                                type="button"
+                                onClick={() => {setQuarter(1); setOpen(false)}}
+                                className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+                            >
+                                Proceder
+                            </button>))
+            setOpen(true)
+        }else if(newQuarter > quarter + 1){
+            setModalTitle("Advertencia")
+            setModalMessage("No puede saltar cuartos. Debe avanzar de uno en uno.")
+            setOpen(true)
         }
+        else{
+            setQuarter(newQuarter)
+        }
+        
     }
 
     return (
         <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
-            <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+            
 
             <div className="flex-1 overflow-auto">
-                <div className="sticky top-0 z-30 border-b border-gray-200 bg-gray-100/95 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+                <div className=" top-0 z-30 border-b border-gray-200 bg-gray-100/95 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
                     <div
                         className="mx-auto flex items-center justify-between gap-4"
                         style={{ width: SHEET_WIDTH }}
@@ -126,7 +156,7 @@ export default function FormPlanilla() {
                                         key={q.id}
                                         type="button"
                                         disabled={isLocked}
-                                        onClick={() => setQuarter(q.id)}
+                                        onClick={() => handleQuarterChange(q.id)}
                                         className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
                                             isActive
                                             ? "bg-white text-gray-900 shadow-sm"
@@ -141,7 +171,20 @@ export default function FormPlanilla() {
                                     </button>
                                 )
                             })}
+                            
                         </div>
+                        {
+                            open &&(
+                                <Modal open 
+                                    onClose ={() => setOpen(false)} 
+                                    title={modalTitle}
+                                    size="sm"
+                                    footer={modalFooter}
+                                    >
+                                        <p>{modalMessage}</p>
+                                    </Modal>
+                                )
+                        }
                     </div>
                 </div>
 
@@ -153,29 +196,30 @@ export default function FormPlanilla() {
                         className="relative mx-auto my-4 bg-white p-4 shadow-md dark:bg-gray-950"
                     >
                         <HalftimeWatcher getValues={methods.getValues} groups={["teamA", "teamB"]} />
-                        <div className="w-[1061px]">
+                        <div className="w-[1087px]">
                             <FormHeadInputs />
                         </div>
 
-                        <div className="flex w-[1050px] flex-row items-start gap-[14px]">
-                            <div className="flex w-[500px] shrink-0 flex-col">
+                        <div className="flex w-[1089px] flex-row items-start ">
+                            <div className="flex w-[514px] shrink-0 flex-col">
                                 <div className="flex h-[1018px] flex-col">
-                                    <div className="h-[509px]">
+                                    <div className="min-h-0 flex-1">
                                         <TeamForm team="A" />
                                     </div>
-                                    <div className="h-[509px]">
+                                    <div className="min-h-0 flex-1">
                                         <TeamForm team="B" />
                                     </div>
                                 </div>
                             </div>
+                            <div className="w-7 shrink-0" aria-hidden="true" />
                             <div>
-                                <div className="h-[1018px] w-[547px] shrink-0">
+                                <div className="h-[1018px] w-[545px] shrink-0">
                                     <RunningScoreForm />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex w-[1061px] flex-row items-start">
+                        <div className="flex w-[1088px] flex-row items-start">
                             <TableForm />
                             <ScoresForm />
                         </div>

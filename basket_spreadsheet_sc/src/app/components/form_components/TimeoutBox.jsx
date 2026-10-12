@@ -1,10 +1,12 @@
 "use client"
 import { useFormContext, useController } from "react-hook-form"
 import { useEffect, useState } from "react"
+import { useMatchStore } from "../../utils/store/matchStore"
 
 export default function TimeoutBox({ group, color, boxid }) {
   const { control } = useFormContext()
   const name = `${group}.timeouts.${boxid}`
+  const isFinal = useMatchStore((state) => state.gameEnded)
   const { field } = useController({
     name,
     control,
@@ -12,7 +14,7 @@ export default function TimeoutBox({ group, color, boxid }) {
       pattern: { value: /^([0-9]{0,2}|=)$/, message: "Solo números" },
     },
   })
-
+  console.log(isFinal, field.value, "isFinal and field.value in TimeoutBox")
   const [lockedColor, setLockedColor] = useState(null)
 
   useEffect(() => {
@@ -50,9 +52,10 @@ export default function TimeoutBox({ group, color, boxid }) {
         onChange={handleChange}
         onBlur={field.onBlur}
         ref={field.ref}
+        disabled={isFinal}
       />
 
-      {isVoid && (
+      {(isVoid || isFinal) && (
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full text-black"
           viewBox="0 0 24 24"

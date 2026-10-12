@@ -10,7 +10,7 @@ export default function DorsalSelect({ gname, players = [], color, handleChange 
     const name = `${gname}.dorsal`
 
     const { field } = useController({ name, control })
-    const points = useWatch({ control, name: `${gname}.points` }) // solo esta celda
+    const points = useWatch({ control, name: `${gname}.points` }) 
 
     useEffect(() => {
         const hasValue = field.value !== undefined && field.value !== "" && field.value !== null;
@@ -46,7 +46,7 @@ export default function DorsalSelect({ gname, players = [], color, handleChange 
                 ref={field.ref}
                 onBlur={field.onBlur}
                 onChange={(e) => {
-                    const previousDorsal = field.value || ""; // antes de que cambie
+                    const previousDorsal = field.value || ""; 
                     field.onChange(e);
                     handleChange(name, e.target.value, previousDorsal);
                 }}

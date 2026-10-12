@@ -1,13 +1,11 @@
 import ScoreColumn from "../form_components/ScoreColumn"
 import { useFormContext } from "react-hook-form"
 import { useState, useEffect } from "react";
-import { useMatchStore } from "../../utils/store/matchStore"; // <-- Importamos tu store
-
+import { useMatchStore } from "../../utils/store/matchStore"; 
 export function useTeamPlayers(team) {
   const { watch, getValues } = useFormContext();
-  const quarter = useMatchStore((state) => state.quarter); // <-- Obtenemos el cuarto actual
+  const quarter = useMatchStore((state) => state.quarter); 
 
-  // Función para obtener y formatear los jugadores actuales
   const getProcessedPlayers = () => {
     const currentPlayers = getValues(`team${team}.players`) ?? [];
     return currentPlayers
@@ -15,7 +13,6 @@ export function useTeamPlayers(team) {
       .map((p) => ({ number: p.number, name: p.name }));
   };
 
-  // Estado local para almacenar la lista procesada
   const [players, setPlayers] = useState(getProcessedPlayers);
 
   useEffect(() => {
@@ -44,7 +41,7 @@ export function useTeamPlayers(team) {
       subscription.unsubscribe();
       clearTimeout(timeoutId);
     };
-  }, [watch, getValues, team, quarter]); // <-- quarter se añade a las dependencias
+  }, [watch, getValues, team, quarter]); 
 
   return players;
 }
@@ -54,7 +51,7 @@ export default function RunningScoreForm() {
     const playersB = useTeamPlayers("B")
    
     return(
-     <div>
+     <div >
         <div >
             <p className="text-center font-bold border-r border-l" style={{fontSize:20}}>Running Score</p>
         </div>
@@ -63,6 +60,7 @@ export default function RunningScoreForm() {
                 <ScoreColumn team="A" range={[1,40]} players={playersA} />
                 <ScoreColumn team="B" range={[1,40]} players={playersB}/>
             </div>
+            
             <div className="flex flex-row">
                 <ScoreColumn team="A" range={[41,80]} players={playersA}/>
                 <ScoreColumn team="B" range={[41,80]} players={playersB}/>

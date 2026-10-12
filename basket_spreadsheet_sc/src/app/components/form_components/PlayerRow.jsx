@@ -6,7 +6,7 @@ import PlayerInToggle from "./PlayerInToggle"
 
 const DOUBLE_TAP_DELAY = 300 
 
-export default function PlayerRow({ group, index, totalRows }) {
+export default function PlayerRow({ group, index, totalRows,disabled = false }) {
   const { register, control, getValues, setValue, trigger } = useFormContext()
   const base = `${group}.players.${index}`
 
@@ -42,27 +42,24 @@ export default function PlayerRow({ group, index, totalRows }) {
   return (
     <tr className="">
       <td className="border border-black p-0">
-        <input
-          type="text"
-          disabled
+        <input type="text" disabled
           className="w-full bg-gray-100 px-1 py-0.5 text-center cursor-not-allowed"
-          {...register(`${base}.licence`)}
-        />
+          {...register(`${base}.licence`)} />
       </td>
 
       <td className="border border-black p-0">
         <div className="flex items-center gap-1 px-1">
           <input
             type="text"
-            placeholder="Player name"
-            className="flex-1 bg-transparent px-1 py-0.5 focus:outline-none"
-            onClick={handleNameClick}
-            
-            
+            placeholder={disabled ? "" : "Player name"}
+            disabled={disabled}
+            className="flex-1 bg-transparent px-1 py-0.5 focus:outline-none disabled:cursor-not-allowed"
+            onClick={disabled ? undefined : handleNameClick}
             style={{ touchAction: "manipulation" }}
             title="Doble click / doble tap para asignar capitán"
             {...register(`${base}.name`)}
           />
+          
           {isCaptain && (
             <span className="text-red-500 font-bold whitespace-nowrap">(CAP)</span>
           )}
@@ -75,12 +72,14 @@ export default function PlayerRow({ group, index, totalRows }) {
               })}
             />
           )}
+          
         </div>
       </td>
 
       <td className="border border-black p-0">
         <input
           type="text"
+          disabled={disabled}
           className="w-full text-center bg-transparent px-1 py-0.5 focus:outline-none"
           {...register(`${base}.number`, {
             onChange: revalidateNumbers,
@@ -97,10 +96,9 @@ export default function PlayerRow({ group, index, totalRows }) {
       </td>
 
       <td className="border border-black p-0 text-center">
-        <PlayerInToggle group={group} index={index} />
+        <PlayerInToggle group={group} index={index} disabled={disabled} />
       </td>
-
-      <FoulsCells group={group} index={index} />
+      <FoulsCells group={group} index={index} disabled={disabled} />
     </tr>
   )
 }
