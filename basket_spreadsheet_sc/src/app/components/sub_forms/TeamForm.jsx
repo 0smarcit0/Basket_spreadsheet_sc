@@ -32,12 +32,13 @@ export default function TeamForm(props) {
           <div>
             <p className="pr-1 pl-1 text-center" style={{ fontSize: 18 }}>Team fouls</p>
             <div className="flex items-center gap-2 h-[22px]">
+              
               <span style={{ fontSize: 16 }}> Q1</span>
               <FoulRow group={group} period={1} count={foulsPerPeriod} color="text-red-500" />
               <span style={{ fontSize: 16 }}> Q2</span>
               <FoulRow group={group} period={2} count={foulsPerPeriod} color="text-black" />
             </div>
-            <div className="flex items-center gap-2 h-[22px]">
+            <div className="flex items-center gap-2 h-[22px] mt-1">
               <span style={{ fontSize: 16 }}> Q3</span>
               <FoulRow group={group} period={3} count={foulsPerPeriod} color="text-red-500" />
               <span style={{ fontSize: 16 }}> Q4</span>

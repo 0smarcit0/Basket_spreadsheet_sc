@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "html2canvas-pro": "^2.5.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.45.0",

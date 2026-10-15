@@ -49,6 +49,10 @@ export default function FoulBox({ group, period, index, color, }) {
           )}
         </svg>
       )}
+      <p className="text-black">
+        {index+1}
+      </p>
+      
     </button>
   )
 }

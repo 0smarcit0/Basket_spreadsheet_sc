@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react"
 
 const STORAGE_KEY = "torneos"
 
-// Lee y valida: siempre devuelve un arreglo de strings
 function readStorage() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
