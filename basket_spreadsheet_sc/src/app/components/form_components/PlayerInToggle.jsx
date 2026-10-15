@@ -4,10 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { X, Circle } from "lucide-react"
 import { useMatchStore } from "../../utils/store/matchStore"
 
-// Reglas de color por cuarto
 function getColorForQuarter(quarter) {
   if (quarter === 1 || quarter === 3) return "red"
-  // 2, 4, overtime (y cualquier otro caso) => negro
   return "black"
 }
 
@@ -16,11 +14,10 @@ const COLOR_CLASSES = {
   black: "text-black",
 }
 
-// Parsea el valor guardado: "" | "starter:red" | "sub:black" | (legacy) "starter" | "sub"
 function parseValue(value) {
   if (!value) return { type: "", color: null }
   const [type, color] = value.split(":")
-  return { type, color: color || "black" } // fallback para valores viejos sin color
+  return { type, color: color || "black" } 
 }
 
 function Icon({ type, color }) {
@@ -43,7 +40,7 @@ function Icon({ type, color }) {
   return null
 }
 
-export default function PlayerInToggle({ group, index }) {
+export default function PlayerInToggle({ group, index, disabled = false }) {
   const quarter = useMatchStore((state) => state.quarter)
   const name = `${group}.players.${index}.playerIn`
   const { field } = useController({ name, defaultValue: "" })
@@ -77,6 +74,7 @@ export default function PlayerInToggle({ group, index }) {
     <div ref={ref} className="relative w-6 h-5.5 mx-auto">
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className="w-6 h-6 flex items-center justify-center"
         title="Selecciona: vacío / titular / entra por cambio"
@@ -84,14 +82,13 @@ export default function PlayerInToggle({ group, index }) {
         <Icon type={currentType} color={currentColor} />
       </button>
 
-      {open && (
+      {open && !disabled && (
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-gray-300 rounded shadow-md z-10 flex flex-col py-1">
           <button
             type="button"
             onClick={() => handleSelect("")}
             className="w-7 h-7 flex items-center justify-center hover:bg-gray-100"
           >
-            {/* opción vacía */}
           </button>
           <button
             type="button"

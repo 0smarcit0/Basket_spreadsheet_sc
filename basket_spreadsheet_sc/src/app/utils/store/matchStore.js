@@ -9,6 +9,14 @@ const markLastScored = (state, q) => {
   return next;
 };
 
+// Marca especial de prórroga: SOLO la última fila de cada equipo en este momento
+const markOvertimeEntry = (state) => {
+  const next = { A: { ...state.overtimeMarks.A }, B: { ...state.overtimeMarks.B } };
+  if (state.teamAcurrentScore > 0) next.A[state.teamAcurrentScore] = true;
+  if (state.teamBcurrentScore > 0) next.B[state.teamBcurrentScore] = true;
+  return next;
+};
+
 export const useMatchStore = create((set, get) => ({
   quarter: 0,
   previousQuarter: 0,
@@ -23,6 +31,7 @@ export const useMatchStore = create((set, get) => ({
   scoredStackA: [],
   scoredStackB: [],
   endMarks: { A: {}, B: {} }, 
+  overtimeMarks: { A: {}, B: {} },
   finalRow: { A: null, B: null },
   halftimeBoundaries: {},
 
@@ -60,25 +69,30 @@ export const useMatchStore = create((set, get) => ({
       teamBcurrentScore: stack.length ? stack[stack.length - 1] : 0,
     };
   }),
-   increaseQuarter: () =>
-    set((state) => ({
+  increaseQuarter: () =>
+  set((state) => {
+    const nextQ = state.quarter + 1;
+    return {
       previousQuarter: state.quarter,
-      quarter: state.quarter + 1,
-      
+      quarter: nextQ,
       endMarks: state.quarter > 0 ? markLastScored(state, state.quarter) : state.endMarks,
-    })),
+      overtimeMarks: nextQ >= 5 ? markOvertimeEntry(state) : state.overtimeMarks,
+    };
+  }),
 
   setQuarter: (q) =>
-    set((state) => ({
-      previousQuarter: state.quarter,
-      quarter: q,
-      endMarks:
-        state.quarter > 0 && q > state.quarter
-          ? markLastScored(state, state.quarter)
-          : state.endMarks,
-      halftimeCaptured:
-        state.halftimeCaptured || (state.quarter === 2 && q === 3),
-    })),
+  set((state) => ({
+    previousQuarter: state.quarter,
+    quarter: q,
+    endMarks:
+      state.quarter > 0 && q > state.quarter
+        ? markLastScored(state, state.quarter)
+        : state.endMarks,
+    overtimeMarks:
+      q >= 5 && q > state.quarter ? markOvertimeEntry(state) : state.overtimeMarks,
+    halftimeCaptured:
+      state.halftimeCaptured || (state.quarter === 2 && q === 3),
+  })),
 
   endGame: () =>
     set((state) => ({
@@ -102,4 +116,7 @@ export const useMatchStore = create((set, get) => ({
 
   resetHalftimeBoundaries: () =>
     set({ halftimeBoundaries: {}, halftimeCaptured: false }),
+
+
+  
 }))

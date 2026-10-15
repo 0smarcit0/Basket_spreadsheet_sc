@@ -24,48 +24,39 @@ export function FoulLabel({ type, color, types, size = "text-xs" }) {
   const option = types.find((o) => o.value === type)
   if (!option || !option.value) return null
   const colorClass = COLOR_CLASSES[color] || "text-black"
-  return (
-    <span className={`${size} font-bold leading-none ${colorClass}`}>
+
+  const circleSize =
+    size === "text-base" ? "h-7 min-w-[1.75rem]" : "h-5 min-w-[1.25rem]"
+
+  const content = (
+    <>
       {option.label}
       {option.sup !== null && <sub className="text-[9px]">{option.sup}</sub>}
+    </>
+  )
+
+  if (option.circle) {
+    return (
+      <span
+        className={`${size} ${colorClass} ${circleSize} inline-flex items-center justify-center rounded-full border border-current px-0.5 font-bold leading-none`}
+      >
+        {content}
+      </span>
+    )
+  }
+
+  
+  return (
+    <span className={`${size} font-bold leading-none ${colorClass}`}>
+      {content}
     </span>
   )
 }
 
-// Celda de foul genérica: recibe el nombre completo del campo RHF y el set de tipos
-export function FoulCell({ name, types, neighbors = {}, rowNames = [] }) {
-  const gameEnded = useMatchStore((state) => state.gameEnded)
-  const { getValues } = useFormContext()
-  const quarter = useMatchStore((state) => state.quarter)
-  const secondHalfStarted = useMatchStore((state) => state.halftimeCaptured)
-  const { field } = useController({ name, defaultValue: "" })
+function FoulPicker({ field, types, flatTypes, disabled = false, className = "" }) {
+  const gameEnded = useMatchStore((s) => s.gameEnded)
+  const quarter = useMatchStore((s) => s.quarter)
   const [open, setOpen] = useState(false)
-  const [frozenLines, setFrozenLines] = useState("")
-
-  const flatTypes = useMemo(() => types.flatMap((c) => c.options), [types])
-
-  // Foto del estado en el momento en que termina la primera mitad
-  useEffect(() => {
-    if (!secondHalfStarted) {
-      setFrozenLines("")
-      return
-    }
-    const used = (n) => !!getValues(n)
-    const self = used(name)
-    const { left, right, top, bottom } = neighbors
-    const lines = []
-
-    if (left && used(left) !== self) lines.push("border-l-[6px]")
-    if (right && used(right) !== self) lines.push("border-r-[6px]")
-    if (top && used(top) !== self) lines.push("border-t-[6px]")
-    if (bottom && used(bottom) !== self) lines.push("border-b-[6px]")
-
-    if (rowNames.length > 0 && rowNames.every((n) => !used(n))) {
-      lines.push("border-l-[6px]")
-    }
-
-    setFrozenLines([...new Set(lines)].join(" "))
-  }, [secondHalfStarted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { type: currentType, color: currentColor } = parseValue(field.value)
   const liveColor = getColorForQuarter(quarter)
@@ -76,22 +67,17 @@ export function FoulCell({ name, types, neighbors = {}, rowNames = [] }) {
   }
 
   return (
-    <td className={`relative border border-black p-0 text-center w-6 h-1 ${frozenLines}`}>
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full h-full flex items-center justify-center"
-        disabled={gameEnded}
+        className={`flex items-center justify-center disabled:cursor-not-allowed ${className}`}
+        disabled={gameEnded || disabled}
       >
         <FoulLabel type={currentType} color={currentColor} types={flatTypes} />
       </button>
 
-      {gameEnded && !field.value && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-black" />
-      )}
-
-      {/* Solo se monta mientras está abierto */}
-      {open && (
+      {open && !disabled && (
         <Modal
           open
           onClose={() => setOpen(false)}
@@ -136,6 +122,72 @@ export function FoulCell({ name, types, neighbors = {}, rowNames = [] }) {
           </div>
         </Modal>
       )}
+    </>
+  )
+}
+export function SixthFoulCell({ name, types, disabled = false }) {
+  const { field } = useController({ name, defaultValue: "" })
+  const flatTypes = useMemo(() => types.flatMap((c) => c.options), [types])
+
+  return (
+    <FoulPicker
+      field={field}
+      types={types}
+      flatTypes={flatTypes}
+      disabled={disabled}
+      className="absolute left-full top-0 h-full w-6"
+    />
+  )
+}
+// Celda de foul genérica: recibe el nombre completo del campo RHF y el set de tipos
+export function FoulCell({ name, types, neighbors = {}, rowNames = [], disabled = false, extra = null }) {
+  const gameEnded = useMatchStore((state) => state.gameEnded)
+  const { getValues } = useFormContext()
+  const secondHalfStarted = useMatchStore((state) => state.halftimeCaptured)
+  const { field } = useController({ name, defaultValue: "" })
+  const [frozenLines, setFrozenLines] = useState("")
+
+  const flatTypes = useMemo(() => types.flatMap((c) => c.options), [types])
+
+  useEffect(() => {
+    if (!secondHalfStarted) {
+      setFrozenLines("")
+      return
+    }
+    const used = (n) => !!getValues(n)
+    const self = used(name)
+    const { left, right, top, bottom } = neighbors
+    const lines = []
+
+    if (left && used(left) !== self) lines.push("border-l-[6px]")
+    if (right && used(right) !== self) lines.push("border-r-[6px]")
+    if (top && used(top) !== self) lines.push("border-t-[6px]")
+    if (bottom && used(bottom) !== self) lines.push("border-b-[6px]")
+
+    if (rowNames.length > 0 && rowNames.every((n) => !used(n))) {
+      lines.push("border-l-[6px]")
+    }
+
+    setFrozenLines([...new Set(lines)].join(" "))
+  }, [secondHalfStarted]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  
+
+  return (
+    <td className={`relative border border-black p-0 text-center w-6 h-1 ${frozenLines}`}>
+      <FoulPicker
+        field={field}
+        types={types}
+        flatTypes={flatTypes}
+        disabled={disabled}
+        className="w-full h-full"
+      />
+
+      {gameEnded && !field.value && !disabled && (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-black" />
+      )}
+
+      {extra}
     </td>
   )
 }

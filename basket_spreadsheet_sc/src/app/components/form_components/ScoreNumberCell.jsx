@@ -1,11 +1,10 @@
 "use client"
 import { useFormContext, useWatch } from "react-hook-form";
 import { colorForPeriod } from "./ScoreRow";
-
 export const NUMBER_CELL_WIDTH = 28 // px
 export const ROW_HEIGHT = 24 // px
 
-export default function ScoreNumberCell({ name, value, endMark }) {
+export default function ScoreNumberCell({ name, value, endMark, overtimeMark = false, isFinal = false }) {
     const { control } = useFormContext();
 
     const [points, period] = useWatch({
@@ -31,13 +30,14 @@ export default function ScoreNumberCell({ name, value, endMark }) {
                 </span>
             )}
 
-            {/* 1 punto: "." sobre el número */}
             {points === 1 && (
                 <span className={`pointer-events-none absolute inset-0 flex items-center justify-center ${markColor}`}>
                     <span className="block w-[9px] h-[9px] rounded-full bg-current" />
                 </span>
             )}
-            {endMark !== undefined && (
+            {overtimeMark || isFinal ? (
+                <span className="pointer-events-none absolute inset-0 m-auto w-[20px] h-[20px] rounded-full border-[3px] border-black" />
+            ) : endMark !== undefined && (
                 <span className={`pointer-events-none absolute inset-0 m-auto w-[20px] h-[20px] rounded-full border-2 border-current ${colorForPeriod(endMark)}`} />
             )}
         </td>

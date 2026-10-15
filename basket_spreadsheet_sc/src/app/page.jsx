@@ -1,6 +1,6 @@
 "use client";
 import {useState, useEffect} from 'react';
-import { Plus, Menu, Search, CircleQuestionMark, Settings } from 'lucide-react';
+import { Plus, Menu, Search, CircleQuestionMark, Settings, Trophy } from 'lucide-react';
 import Navbar from './components/Navbar';
 import OptionButton from './components/OptionButton';
 
@@ -69,6 +69,12 @@ export default function App() {
               description="Personaliza tu experiencia y ajusta preferencias"
               icon={Settings}
               path="/search_planillas"
+            />
+            <OptionButton
+              title="Torneos"
+              description="Gestionar torneos y competencias"
+              icon={Trophy}
+              path="/torneos"
             />
           </div>
 

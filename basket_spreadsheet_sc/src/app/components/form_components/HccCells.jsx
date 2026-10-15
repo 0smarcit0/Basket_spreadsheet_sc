@@ -1,7 +1,7 @@
 "use client"
 import { useController, useFormContext } from "react-hook-form"
 import { useMatchStore } from "../../utils/store/matchStore"
-import { getColorForQuarter, COLOR_CLASSES } from "./FoulShared" // ajusta la ruta si es distinta
+import { getColorForQuarter, COLOR_CLASSES } from "./FoulShared" 
 
 const QUARTER_OPTIONS = ["Q1", "Q2", "Q3", "Q4", "OT"]
 const MINUTE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -11,6 +11,24 @@ const selectClass =
   "text-[12px] font-bold leading-none cursor-pointer focus:outline-none " +
   "focus:ring-2 focus:ring-inset focus:ring-blue-500"
 
+
+
+function EqualsMark() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full text-black"
+      viewBox="0 0 24 24"
+      preserveAspectRatio="none"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="butt"
+    >
+      <line x1="0" y1="8" x2="24" y2="8" vectorEffect="non-scaling-stroke" />
+      <line x1="0" y1="16" x2="24" y2="16" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+} 
 /**
  * name: prefijo del path en el formulario, ej. "teamA.hcc"
  * Guarda: {name}.quarter  -> "Q1" | "Q2" | "Q3" | "Q4" | "OT"
@@ -19,7 +37,7 @@ const selectClass =
  */
 export default function HccCells({ name }) {
   const { control, setValue, getValues } = useFormContext()
-
+  const isFinal = useMatchStore((state) => state.gameEnded)
   const { field: quarterField } = useController({ name: `${name}.quarter`, control, defaultValue: "" })
   const { field: minuteField } = useController({ name: `${name}.minute`, control, defaultValue: "" })
   const { field: colorField } = useController({ name: `${name}.color`, control, defaultValue: "" })
@@ -40,7 +58,7 @@ export default function HccCells({ name }) {
   return (
     <div className="flex items-end gap-1">
 
-      <div className="flex h-[20px] border border-black">
+      <div className="flex h-[20px] border border-black relative">
         <div className="h-full w-[26px] border-r border-black">
           <select
             className={`${selectClass} ${colorClass}`}
@@ -52,12 +70,14 @@ export default function HccCells({ name }) {
               quarterField.onChange(e)
               syncColor(e.target.value, minuteField.value)
             }}
+            disabled={isFinal}
           >
             <option value=""></option>
             {QUARTER_OPTIONS.map((q) => (
               <option key={q} value={q} className="text-black">{q}</option>
             ))}
           </select>
+          {isFinal && <EqualsMark />}
         </div>
 
         <div className="h-full w-[26px]">
@@ -71,13 +91,16 @@ export default function HccCells({ name }) {
               minuteField.onChange(e)
               syncColor(quarterField.value, e.target.value)
             }}
+            disabled={isFinal}
           >
             <option value=""></option>
             {MINUTE_OPTIONS.map((m) => (
               <option key={m} value={m} className="text-black">{m}</option>
             ))}
           </select>
+          {isFinal && <EqualsMark />}
         </div>
+        
       </div>
     </div>
   )

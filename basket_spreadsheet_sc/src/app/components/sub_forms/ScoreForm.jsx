@@ -70,10 +70,9 @@ export default function ScoresForm({
 
   return (
     <div
-      className="w-[561px] shrink-0 border border-black text-black"
+      className="w-[52.75%] shrink-0 border border-black text-black"
       style={{ fontFamily: FONT }}
     >
-      {/* SECCIÓN 1: Scores */}
       <div className="h-[126px] px-2 py-[6px]">
         <div className="grid grid-cols-[60px_105px_1fr_1fr] gap-x-4 gap-y-[6px]">
           <span className={`${label} row-span-5 self-start text-[18px]`}>Scores</span>
@@ -83,36 +82,34 @@ export default function ScoresForm({
               <span className={`${label} h-[18px] text-right leading-[18px]`}>{text}</span>
               <div className="flex items-end gap-1">
                 <span className={label}>A</span>
-                <input readOnly className={`${line} ${color}`} {...register(`scores.A.${n}`)} />
+                <input  className={`${line} ${color}`} {...register(`scores.A.${n}`)} type="number" />
               </div>
               <div className="flex items-end gap-1">
                 <span className={label}>B</span>
-                <input readOnly className={`${line} ${color}`} {...register(`scores.B.${n}`)} />
+                <input  className={`${line} ${color}`} {...register(`scores.B.${n}`)} type="number"/>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* SECCIÓN 2: Final Score + ganador */}
       <div className="flex h-[58px] flex-col justify-center gap-[10px] border-t border-black px-2">
         <div className="flex items-end gap-1">
           <span className={label}>Final Score</span>
           <span className={`${label} ml-auto pr-1`}>Team A</span>
-          <input readOnly className={`${line} max-w-[80px] text-black`} {...register("scores.final.A")} />
+          <input  className={`${line} max-w-[80px] text-black`} {...register("scores.final.A")} type="number" />
           <span className={`${label} ml-4 pr-1`}>Team B</span>
-          <input readOnly className={`${line} max-w-[80px] text-black`} {...register("scores.final.B")} />
+          <input  className={`${line} max-w-[80px] text-black`} {...register("scores.final.B")} type="number" />
         </div>
         <div className="flex items-end gap-1">
           <span className={label}>Name of winning team</span>
-          <input readOnly className={`${line} text-left text-black`} {...register("scores.winner")} />
+          <input  className={`${line} text-left text-black`} {...register("scores.winner")} type="text"/>
         </div>
       </div>
 
-      {/* SECCIÓN 3: Game ended at */}
       <div className="flex h-[36px] items-end gap-1 border-t border-black px-2 pb-[6px]">
         <span className={label}>Game ended at (hh:mm)</span>
-        <input className={`${line} text-left text-black`} {...register("scores.gameEndedAt")} />
+        <input className={`${line} text-left text-black`} {...register("scores.gameEndedAt")}/>
       </div>
     </div>
   )
