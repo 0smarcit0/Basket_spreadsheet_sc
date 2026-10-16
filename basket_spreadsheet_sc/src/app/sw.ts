@@ -1,5 +1,4 @@
 /// <reference lib="webworker" />
-// app/sw.ts
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { Serwist } from "serwist";
