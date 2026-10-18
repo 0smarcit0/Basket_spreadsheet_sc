@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -p none \"serwist build --watch\" \"next dev\"",
-    "build": "next build && serwist build",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start"
   },
   "dependencies": {
@@ -20,8 +20,6 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@serwist/cli": "^9.5.12",
-    "@serwist/next": "^9.5.12",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "26.6.4",
     "@types/react": "^19.2.18",
@@ -30,7 +28,6 @@
     "concurrently": "^10.0.5",
     "esbuild": "^0.28.2",
     "oxlint": "^1.81.0",
-    "serwist": "^9.5.12",
     "tailwindcss": "^4.3.3",
     "typescript": "7.0.2",
     "vite": "^8.3.0"
