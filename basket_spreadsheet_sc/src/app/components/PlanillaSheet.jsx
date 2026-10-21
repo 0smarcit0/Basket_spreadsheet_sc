@@ -9,8 +9,7 @@ import HalftimeWatcher from "../components/form_components/HalfTimeWatcher";
 import ScoresForm from "../components/sub_forms/ScoreForm";
 import { useMatchStore } from "../utils/store/matchStore";
 import Link from "next/link"
-import { generateHalftimeReport } from "../utils/halfTimeReport" 
-import { generateGameReport } from "../utils/gameReport"
+import { generateFinalMatchReportFile } from "../utils/gameReport"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import Modal from "../components/Modal"
 import SheetBanner, {BANNER_HEIGHT} from "../components/sub_forms/SheetBanner"
@@ -51,8 +50,7 @@ export default function FormPlanilla({initialMode="new"}) {
     const [generating, setGenerating] = useState(false)
     const [pendingFile, setPendingFile] = useState(null)
     const [open, setOpen] = useState(false)
-    const [reportMenuOpen, setReportMenuOpen] = useState(false)
-    const reportMenuRef = useRef(null)
+    const [generatingReport, setGeneratingReport] = useState(false)
     const endByForfeit = useMatchStore((state) => state.endByForfeit)
     const [forfeitMenuOpen, setForfeitMenuOpen] = useState(false)
     const forfeitMenuRef = useRef(null)
@@ -211,25 +209,7 @@ export default function FormPlanilla({initialMode="new"}) {
 
 
 
-    function useDismiss(ref, open, onClose) {
-      useEffect(() => {
-        if (!open) return;
-        const onMouseDown = (e) => {
-          if (!ref.current?.contains(e.target)) onClose();
-        };
-        const onKeyDown = (e) => {
-          if (e.key === "Escape") onClose();
-        };
-        document.addEventListener("mousedown", onMouseDown);
-        document.addEventListener("keydown", onKeyDown);
-        return () => {
-          document.removeEventListener("mousedown", onMouseDown);
-          document.removeEventListener("keydown", onKeyDown);
-        };
-      }, [open]);
-    }
-    useDismiss(reportMenuRef, reportMenuOpen, () => setReportMenuOpen(false))
-    useDismiss(forfeitMenuRef, forfeitMenuOpen, () => setForfeitMenuOpen(false))
+    
 
     const handleQuarterChange = (newQuarter) => {
         if(quarter === 0 && newQuarter === 1) {
@@ -280,33 +260,25 @@ export default function FormPlanilla({initialMode="new"}) {
 
       setReady(true);
     }, []);
-    /*useEffect(() => {
-        if (!reportMenuOpen) return
+    const handleFinalReport = async () => {
+      if (!gameEnded || generatingReport || generating) return;
+      setGeneratingReport(true);
+      try {
+        const file = await generateFinalMatchReportFile(methods.getValues());
+        if (!file) return;
 
-        const onMouseDown = (e) => {
-            if (!reportMenuRef.current?.contains(e.target)) setReportMenuOpen(false)
-        }
-        const onKeyDown = (e) => {
-            if (e.key === "Escape") setReportMenuOpen(false)
-        }
+        // En móvil la entrega requiere un toque del usuario (modal de compartir)
+        if (isMobileOrTablet()) setPendingFile(file);
+        else downloadFile(file);
+      } catch (err) {
+        console.error(err);
+        showModal("Error", "No se pudo generar el reporte final.");
+      } finally {
+        setGeneratingReport(false);
+      }
+    };
 
-        document.addEventListener("mousedown", onMouseDown)
-        document.addEventListener("keydown", onKeyDown)
-        return () => {
-            document.removeEventListener("mousedown", onMouseDown)
-            document.removeEventListener("keydown", onKeyDown)
-        }
-    }, [reportMenuOpen])*/
-
-    const handleHalftimeReport = (team) => {
-        setReportMenuOpen(false)
-        generateHalftimeReport(methods.getValues(), team)
-    }
-    const handleFinalReport = (team) => {
-      if (!gameEnded) return
-        setReportMenuOpen(false)
-        generateGameReport(methods.getValues(), team)
-    }
+ 
 
 
 
@@ -392,68 +364,16 @@ export default function FormPlanilla({initialMode="new"}) {
                     </div>
                   )}
                 </div>
-                <div ref={reportMenuRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setReportMenuOpen((v) => !v)}
-                    aria-haspopup="menu"
-                    aria-expanded={reportMenuOpen}
-                    className="flex cursor-pointer items-center gap-1 rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-                  >
-                    Reportes
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform ${reportMenuOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  {reportMenuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                    >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={quarter <= 2}
-                        onClick={() => handleHalftimeReport("A")}
-                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-gray-100 dark:hover:bg-gray-700"
-                      >
-                        Reporte mitad equipo A
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={quarter <= 2}
-                        onClick={() => handleHalftimeReport("B")}
-                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-gray-100 dark:hover:bg-gray-700"
-                      >
-                        Reporte mitad equipo B
-                      </button>
-
-                      <div className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleFinalReport("A")}
-                        disabled={!gameEnded}
-                        className="block w-full  px-4 py-2 text-left text-sm text-gray-800 disabled:opacity-40 dark:text-gray-100"
-                      >
-                        Reporte final equipo A
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={!gameEnded}
-                        onClick={() => handleFinalReport("B")}
-                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 disabled:opacity-40  dark:text-gray-100"
-                      >
-                        Reporte final equipo B
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleFinalReport}
+                  disabled={!gameEnded || generatingReport || generating}
+                  className="cursor-pointer rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {generatingReport
+                    ? "Generando reporte..."
+                    : "Generar reporte final"}
+                </button>
               </div>
 
               <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300">

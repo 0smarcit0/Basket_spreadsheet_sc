@@ -1,5 +1,6 @@
 import { useMatchStore } from "./store/matchStore"
 import { createHeaderPainter, loadLogo, HEADER_BOTTOM } from "./pdfHeader"
+import { generatePlanillaCanvas } from "./print_planilla"
 function getTeamName(values, team) {
   const group = `team${team}`
   const name = values[group]?.name?.trim() || values.head?.[group]?.trim()
@@ -146,3 +147,94 @@ export async function generateGameReport(values, team) {
   doc.save(`Reporte final ${sanitizeFileName(teamName)}.pdf`)
 
 }
+
+
+// "DD-MM-YYYY" con la fecha local de hoy (sin "/" porque no es válido en nombres de archivo)
+const todayStamp = () => {
+  const d = new Date()
+  const dd = String(d.getDate()).padStart(2, "0")
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  return `${dd}-${mm}-${d.getFullYear()}`
+}
+
+const PAGE_MARGIN = 20   // margen alrededor de la imagen de la planilla
+const TABLE_MARGIN = 40  // margen de las tablas
+const MIN_TABLE_SPACE = 140 // espacio mínimo para empezar una tabla en la misma página
+
+// Genera un PDF con la planilla (imagen) y debajo la tabla de ambos equipos.
+// Devuelve un File; quien llama decide si descargar o compartir.
+export async function generateFinalMatchReportFile(values, elementId = "planilla-form") {
+  if (!useMatchStore.getState().gameEnded) return null
+
+  const { jsPDF } = await import("jspdf")
+  const autoTable = (await import("jspdf-autotable")).default
+
+  // 1) Planilla como imagen
+  const canvas = await generatePlanillaCanvas(elementId)
+  const ratio = canvas.height / canvas.width
+  const imageData = canvas.toDataURL("image/jpeg", 0.92)
+  canvas.width = canvas.height = 0 // libera memoria (importante en móviles)
+
+  // 2) Documento y planilla ajustada al ancho de la hoja
+  const doc = new jsPDF({ unit: "pt", format: "a4" })
+  const stamp = todayStamp()
+  doc.setProperties({ title: `Reporte final partido ${stamp}` })
+
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  let imgW = pageW - PAGE_MARGIN * 2
+  let imgH = imgW * ratio
+  const maxH = pageH - PAGE_MARGIN * 2
+  if (imgH > maxH) {
+    imgH = maxH
+    imgW = imgH / ratio
+  }
+  doc.addImage(imageData, "JPEG", (pageW - imgW) / 2, PAGE_MARGIN, imgW, imgH, undefined, "FAST")
+
+  // 3) Tabla de cada equipo, debajo de la planilla
+  let cursorY = PAGE_MARGIN + imgH + 20
+
+  for (const team of ["A", "B"]) {
+    // Si no queda espacio útil en la página, la tabla empieza en una nueva
+    if (cursorY > pageH - TABLE_MARGIN - MIN_TABLE_SPACE) {
+      doc.addPage()
+      cursorY = TABLE_MARGIN
+    }
+
+    const teamName = getTeamName(values, team)
+    const { rows, footer } = buildTeamRows(values, team)
+
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(13)
+    doc.setTextColor(0)
+    doc.text(`Equipo ${team}: ${teamName}`, TABLE_MARGIN, cursorY + 12)
+
+    autoTable(doc, {
+      startY: cursorY + 20,
+      margin: { top: TABLE_MARGIN, bottom: TABLE_MARGIN, left: TABLE_MARGIN, right: TABLE_MARGIN },
+      head: [["Dorsal", "Nombre", "Tiros libres", "Tiros de 2", "Tiros de 3", "Puntos anotados", "Faltas cometidas"]],
+      body: rows,
+      foot: [footer],
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 4 },
+      headStyles: { fillColor: [30, 64, 175], halign: "center" },
+      footStyles: { fillColor: [229, 231, 235], textColor: 0, fontStyle: "bold", halign: "center" },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 45 },
+        1: { halign: "left" },
+        2: { halign: "center" },
+        3: { halign: "center" },
+        4: { halign: "center" },
+        5: { halign: "center" },
+        6: { halign: "center" },
+      },
+    })
+
+    cursorY = doc.lastAutoTable.finalY + 25
+  }
+
+  const blob = doc.output("blob")
+  return new File([blob], `Reporte final partido ${stamp}.pdf`, { type: "application/pdf" })
+}
+

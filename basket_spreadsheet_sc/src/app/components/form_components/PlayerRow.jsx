@@ -78,7 +78,7 @@ export default function PlayerRow({ group, index, totalRows,disabled = false }) 
 
       <td className="border border-black p-0">
         <input
-          type="text"
+          type="number"
           disabled={disabled}
           className="w-full text-center bg-transparent px-1 py-0.5 focus:outline-none"
           {...register(`${base}.number`, {

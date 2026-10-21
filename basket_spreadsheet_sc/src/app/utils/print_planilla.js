@@ -110,9 +110,7 @@ const replaceFormControls = (clonedDoc, root) => {
         el.parentNode.replaceChild(div, el)
     })
 }
-
-// Paso 1: genera el archivo (asíncrono, puede tardar). NO comparte ni descarga.
-export const generatePlanillaFile = async (elementId, fileName = "planilla.png") => {
+export const generatePlanillaCanvas = async (elementId) => {
     const element = document.getElementById(elementId)
     if (!element) throw new Error(`No se encontró el elemento #${elementId}`)
 
@@ -121,7 +119,7 @@ export const generatePlanillaFile = async (elementId, fileName = "planilla.png")
 
     const { width, height } = element.getBoundingClientRect()
 
-    const canvas = await html2canvas(element, {
+    return html2canvas(element, {
         scale: getScale(width, height),
         backgroundColor: "#ffffff",
         useCORS: true,
@@ -131,7 +129,10 @@ export const generatePlanillaFile = async (elementId, fileName = "planilla.png")
             if (clonedRoot) replaceFormControls(clonedDoc, clonedRoot)
         },
     })
-
+}
+// Paso 1: genera el archivo (asíncrono, puede tardar). NO comparte ni descarga.
+export const generatePlanillaFile = async (elementId, fileName = "planilla.png") => {
+    const canvas = await generatePlanillaCanvas(elementId)
     const blob = await canvasToBlob(canvas)
     return new File([blob], fileName, { type: "image/png" })
 }
