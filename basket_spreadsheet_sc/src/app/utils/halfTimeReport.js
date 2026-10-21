@@ -1,5 +1,5 @@
 import { useMatchStore } from "./store/matchStore"
-
+import { createHeaderPainter, loadLogo, HEADER_BOTTOM } from "./pdfHeader"
 const HALF_LAST_PERIOD = 2
 
 function getTeamName(values, team) {
@@ -57,6 +57,7 @@ function buildTeamRows(values, team, boundaries) {
 export async function generateHalftimeReport(values, team) {
   const { jsPDF } = await import("jspdf")
   const autoTable = (await import("jspdf-autotable")).default
+  const logoData = await loadLogo()
 
   const boundaries = useMatchStore.getState().halftimeBoundaries
   const teamName = getTeamName(values, team)
@@ -65,16 +66,20 @@ export async function generateHalftimeReport(values, team) {
   const doc = new jsPDF({ unit: "pt", format: "a4" })
   doc.setProperties({ title: `Reporte mitad ${teamName}` })
 
+  const paintHeader = createHeaderPainter(doc, logoData)
+  paintHeader()
+
   doc.setFontSize(18)
   doc.setFont("helvetica", "bold")
-  doc.text(`Reporte mitad ${teamName}`, 40, 50)
+  doc.text(`Reporte mitad ${teamName}`, 40, HEADER_BOTTOM + 35)
 
-  let y = 80
+  let y = HEADER_BOTTOM + 65
 
   doc.setFontSize(13)
   doc.text(`Equipo ${team}: ${teamName}`, 40, y)
-
   autoTable(doc, {
+    margin: { top: HEADER_BOTTOM + 20, left: 40, right: 40 },
+    didDrawPage: paintHeader,
     startY: y + 10,
     head: [["Dorsal", "Nombre", "Tiros libres", "Tiros de 2", "Tiros de 3", "Puntos anotados", "Faltas cometidas"]],
     body: rows,
@@ -92,7 +97,6 @@ export async function generateHalftimeReport(values, team) {
       5: { halign: "center" },
       6: { halign: "center" },
     },
-    margin: { left: 40, right: 40 },
   })
 
   y = doc.lastAutoTable.finalY + 35
