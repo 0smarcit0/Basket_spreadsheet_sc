@@ -295,6 +295,11 @@ export default function FormPlanilla({initialMode="new"}) {
         setReportMenuOpen(false)
         generateHalftimeReport(methods.getValues(), team)
     }
+    const handleFinalReport = (team) => {
+      if (!gameEnded) return
+        setReportMenuOpen(false)
+        generateGameReport(methods.getValues(), team)
+    }
 
 
 
@@ -337,6 +342,13 @@ export default function FormPlanilla({initialMode="new"}) {
                   className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-600"
                 >
                   {gameEnded ? "Partido terminado" : "Terminar partido"}
+                </button>
+                <button
+                  type="submit"
+                  form="planilla-form"
+                  className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Guardar Planilla
                 </button>
                 <div ref={forfeitMenuRef} className="relative">
                   <button
@@ -529,13 +541,6 @@ export default function FormPlanilla({initialMode="new"}) {
                 <TableForm />
                 <ScoresForm />
               </div>
-              <button
-                type="submit"
-                form="planilla-form"
-                className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Guardar Planilla
-              </button>
             </form>
           </FormProvider>
         </div>

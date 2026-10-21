@@ -1,5 +1,5 @@
 import { useMatchStore } from "./store/matchStore"
-
+import { createHeaderPainter, loadLogo, HEADER_BOTTOM } from "./pdfHeader"
 function getTeamName(values, team) {
   const group = `team${team}`
   const name = values[group]?.name?.trim() || values.head?.[group]?.trim()
@@ -73,6 +73,7 @@ export async function generateGameReport(values, team) {
 
   const { jsPDF } = await import("jspdf")
   const autoTable = (await import("jspdf-autotable")).default
+  const logoData = await loadLogo()
 
   const teamName = getTeamName(values, team)
   const { rows, footer } = buildTeamRows(values, team)
@@ -81,15 +82,21 @@ export async function generateGameReport(values, team) {
   const doc = new jsPDF({ unit: "pt", format: "a4" })
   doc.setProperties({ title: `Reporte final ${teamName}` })
 
+  const paintHeader = createHeaderPainter(doc, logoData)
+  paintHeader()
+
   doc.setFontSize(18)
   doc.setFont("helvetica", "bold")
-  doc.text(`Reporte final ${teamName}`, 40, 50)
+  doc.text(`Reporte final ${teamName}`, 40, HEADER_BOTTOM + 35)
 
-  const y = 80
+  const y = HEADER_BOTTOM + 65
   doc.setFontSize(13)
   doc.text(`Equipo ${team}: ${teamName}`, 40, y)
 
+
   autoTable(doc, {
+    margin: { top: HEADER_BOTTOM + 20, left: 40, right: 40 },
+    didDrawPage: paintHeader,
     startY: y + 10,
     head: [["Dorsal", "Nombre", "Tiros libres", "Tiros de 2", "Tiros de 3", "Puntos anotados", "Faltas cometidas"]],
     body: rows,
@@ -107,13 +114,13 @@ export async function generateGameReport(values, team) {
       5: { halign: "center" },
       6: { halign: "center" },
     },
-    margin: { left: 40, right: 40 },
   })
 
   let y2 = doc.lastAutoTable.finalY + 30
   if (y2 > doc.internal.pageSize.getHeight() - 140) {
     doc.addPage()
-    y2 = 50
+    paintHeader()
+    y2 = HEADER_BOTTOM + 35
   }
 
   doc.setFontSize(13)
@@ -121,6 +128,8 @@ export async function generateGameReport(values, team) {
   doc.text("Mejores anotadores", 40, y2)
 
   autoTable(doc, {
+    margin: { top: HEADER_BOTTOM + 20, left: 40, right: 40 },
+    didDrawPage: paintHeader,
     startY: y2 + 10,
     head: [["Categoría", "Jugador", "Cantidad"]],
     body: topScorers,
@@ -132,8 +141,8 @@ export async function generateGameReport(values, team) {
       1: { halign: "left" },
       2: { halign: "center", cellWidth: 70 },
     },
-    margin: { left: 40, right: 40 },
   })
 
   doc.save(`Reporte final ${sanitizeFileName(teamName)}.pdf`)
+
 }
