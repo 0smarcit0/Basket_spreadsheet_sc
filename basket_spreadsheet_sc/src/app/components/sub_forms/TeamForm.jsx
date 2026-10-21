@@ -21,7 +21,6 @@ export default function TeamForm(props) {
           {...register(`${group}.name`)}
         />
       </div>
-
       <div className="flex min-h-0 flex-1 items-center">
         <div className="flex gap-6">
           <div className="pb-1 pl-1.5">

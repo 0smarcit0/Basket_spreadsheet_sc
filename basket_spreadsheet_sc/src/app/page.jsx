@@ -20,11 +20,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white dark:bg-black font-sans transition-colors duration-300 flex flex-col">
       <div className="w-full max-w-6xl mx-auto min-h-screen flex flex-col shadow-none sm:shadow-sm sm:border-x border-gray-100 dark:border-gray-900 relative">
-        <Navbar 
-          isDarkMode={isDarkMode} 
-          toggleTheme={() => setIsDarkMode(!isDarkMode)} 
-          />
-        
+        <Navbar
+          isDarkMode={isDarkMode}
+          toggleTheme={() => setIsDarkMode(!isDarkMode)}
+        />
 
         <main className="flex-grow p-4 sm:p-6 md:p-8 flex flex-col">
           <div className="mb-8 md:mb-10">
@@ -36,40 +35,40 @@ export default function App() {
             </h1>
           </div>
 
-          <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 items-start">
             <OptionButton
               title="Nueva planilla"
               description="Crear un nuevo registro desde cero"
               icon={Plus}
               path="/new_planilla"
             />
-            
+
             <OptionButton
               title="Continuar última planilla"
               description="Retomar donde lo dejaste"
               icon={Menu}
-              path="/search_planillas"
+              path="/continue_planilla"
             />
-            
-            <OptionButton
+
+            {/*<OptionButton
               title="Consultar planillas"
               description="Buscar y revisar registros anteriores"
               icon={Search}
               path="/search_planillas"
-            />
+            />*/}
 
-            <OptionButton
+            {/*<OptionButton
               title="Tutorial"
               description="Aclara tus dudas y aprende a usar la app"
               icon={CircleQuestionMark}
               path="/search_planillas"
-            />
-            <OptionButton
+            />*/}
+            {/*<OptionButton
               title="Configuración"
               description="Personaliza tu experiencia y ajusta preferencias"
               icon={Settings}
               path="/search_planillas"
-            />
+            />*/}
             <OptionButton
               title="Torneos"
               description="Gestionar torneos y competencias"
@@ -78,10 +77,13 @@ export default function App() {
             />
           </div>
 
-          <div className="mt-8 md:mt-12 text-center pb-6">
-            <span className="text-xs sm:text-sm text-blue-500 dark:text-blue-400 font-medium">
-              Septiembre 2026
-            </span>
+          <div className="mt-auto pt-8 md:pt-12 text-center pb-6">
+            <p className="text-xs sm:text-sm text-blue-500 dark:text-blue-400 font-medium">
+              Círculo de árbitros de baloncesto libertador
+            </p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              Desarrollado por Osmar Porras 2026
+            </p>
           </div>
         </main>
       </div>

@@ -6,7 +6,7 @@ export default function OptionButton({ title, description, icon: Icon, path, isA
   return (
     <Link
       href={path}
-      className={`w-full flex items-center p-4 mb-4 rounded-2xl text-left transition-all duration-300 group
+      className={`w-full flex items-center p-4 rounded-2xl text-left transition-all duration-300 group
         ${isActive 
           ? 'border-2 border-blue-600 dark:border-blue-500 bg-white dark:bg-black' 
           : 'border border-blue-100 dark:border-gray-800 bg-white dark:bg-black hover:border-blue-400 dark:hover:border-blue-500'

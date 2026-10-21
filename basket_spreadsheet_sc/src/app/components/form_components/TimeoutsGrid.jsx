@@ -9,6 +9,7 @@ const ROWS = [
   { boxes: [6, 7, 8], endsAtQuarter: null, label: "OT" },
 ]
 
+
 const colorForPeriod = (period) =>
   period == 1 || period == 3 ? "text-red-600" : "text-black"
 

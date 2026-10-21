@@ -15,7 +15,10 @@ const FONT = "'Arial Narrow', 'Liberation Sans Narrow', Arial, sans-serif"
 const label = "text-[13px] font-bold leading-none whitespace-nowrap"
 const line =
   "h-[18px] min-w-0 flex-1 border-0 border-b border-black bg-transparent p-0 px-1 text-center text-[13px] font-bold leading-none focus:outline-none"
-
+const nowHHMM = () => {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+}
 export default function ScoresForm({
   teamAName = "teamA.name",
   teamBName = "teamB.name",
@@ -46,22 +49,35 @@ export default function ScoresForm({
       }
 
       if (state.gameEnded && !prev.gameEnded) {
-        closePeriod(state.quarter, state)
+        if (state.forfeit) {
+          const { finalScore, winner } = state.forfeit;
+          setValue("scores.final.A", finalScore.A);
+          setValue("scores.final.B", finalScore.B);
+          setValue(
+            "scores.winner",
+            winner
+              ? (getValues(winner === "A" ? teamAName : teamBName) ?? "")
+              : "",
+          );
+          setValue("scores.gameEndedAt", nowHHMM());
+          return;
+        }
 
-        const a = state.teamAcurrentScore
-        const b = state.teamBcurrentScore
-        setValue("scores.final.A", a)
-        setValue("scores.final.B", b)
+        closePeriod(state.quarter, state);
+
+        const a = state.teamAcurrentScore;
+        const b = state.teamBcurrentScore;
+        setValue("scores.final.A", a);
+        setValue("scores.final.B", b);
         setValue(
           "scores.winner",
-          a > b ? getValues(teamAName) ?? "" : b > a ? getValues(teamBName) ?? "" : ""
-        )
-        // Hora de fin del partido (editable a mano)
-        const now = new Date()
-        setValue(
-          "scores.gameEndedAt",
-          `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
-        )
+          a > b
+            ? (getValues(teamAName) ?? "")
+            : b > a
+              ? (getValues(teamBName) ?? "")
+              : "",
+        );
+        setValue("scores.gameEndedAt", nowHHMM());
       }
     })
 

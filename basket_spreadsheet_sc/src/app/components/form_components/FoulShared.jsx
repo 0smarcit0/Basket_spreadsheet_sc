@@ -1,6 +1,6 @@
 "use client"
-import { useController, useFormContext } from "react-hook-form"
-import { useState, useEffect, useMemo } from "react"
+import { useController } from "react-hook-form"
+import { useState, useMemo } from "react"
 import { useMatchStore } from "../../utils/store/matchStore"
 import Modal from "../Modal" 
 
@@ -139,39 +139,54 @@ export function SixthFoulCell({ name, types, disabled = false }) {
     />
   )
 }
-// Celda de foul genérica: recibe el nombre completo del campo RHF y el set de tipos
+
+const PLAYER_FOUL_RE = /^(team[AB])\.players\.(\d+)\.fouls\.(\d+)$/
+const COACH_FOUL_RE = /^(team[AB])\.(coach|assistantCoach)\.fouls\.(\d+)$/
+
+// "teamA.players.0.fouls.2" -> { key: "teamA-0", n: 2 }
+// "teamA.coach.fouls.1"     -> { key: "teamA-coach", n: 1 }
+function parseFoulName(name) {
+  let m = name.match(PLAYER_FOUL_RE)
+  if (m) return { key: `${m[1]}-${m[2]}`, n: Number(m[3]) }
+  m = name.match(COACH_FOUL_RE)
+  if (m) return { key: `${m[1]}-${m[2]}`, n: Number(m[3]) }
+  return null
+}
+
 export function FoulCell({ name, types, neighbors = {}, rowNames = [], disabled = false, extra = null }) {
   const gameEnded = useMatchStore((state) => state.gameEnded)
-  const { getValues } = useFormContext()
   const secondHalfStarted = useMatchStore((state) => state.halftimeCaptured)
+  const halftimeBoundaries = useMatchStore((state) => state.halftimeBoundaries)
   const { field } = useController({ name, defaultValue: "" })
-  const [frozenLines, setFrozenLines] = useState("")
 
   const flatTypes = useMemo(() => types.flatMap((c) => c.options), [types])
 
-  useEffect(() => {
-    if (!secondHalfStarted) {
-      setFrozenLines("")
-      return
-    }
-    const used = (n) => !!getValues(n)
-    const self = used(name)
+  // Una celda "estaba usada al medio tiempo" si su posición <= faltas registradas
+  // para ese jugador/coach en halftimeBoundaries
+  const usedAtHalftime = (cellName) => {
+    const p = parseFoulName(cellName)
+    if (!p) return false
+    const count = halftimeBoundaries[p.key]
+    return count !== undefined && p.n <= count
+  }
+
+  let frozenLines = ""
+  const own = parseFoulName(name)
+  if (secondHalfStarted && own && halftimeBoundaries[own.key] !== undefined) {
+    const self = usedAtHalftime(name)
     const { left, right, top, bottom } = neighbors
     const lines = []
 
-    if (left && used(left) !== self) lines.push("border-l-[6px]")
-    if (right && used(right) !== self) lines.push("border-r-[6px]")
-    if (top && used(top) !== self) lines.push("border-t-[6px]")
-    if (bottom && used(bottom) !== self) lines.push("border-b-[6px]")
+    if (left && usedAtHalftime(left) !== self) lines.push("border-l-[6px]")
+    if (right && usedAtHalftime(right) !== self) lines.push("border-r-[6px]")
+    if (top && usedAtHalftime(top) !== self) lines.push("border-t-[6px]")
+    if (bottom && usedAtHalftime(bottom) !== self) lines.push("border-b-[6px]")
 
-    if (rowNames.length > 0 && rowNames.every((n) => !used(n))) {
+    if (rowNames.length > 0 && rowNames.every((n) => !usedAtHalftime(n))) {
       lines.push("border-l-[6px]")
     }
-
-    setFrozenLines([...new Set(lines)].join(" "))
-  }, [secondHalfStarted]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  
+    frozenLines = [...new Set(lines)].join(" ")
+  }
 
   return (
     <td className={`relative border border-black p-0 text-center w-6 h-1 ${frozenLines}`}>
