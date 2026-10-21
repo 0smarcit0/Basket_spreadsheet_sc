@@ -1,5 +1,6 @@
 import './global.css'
 import PwaProvider from './components/PwaProvider'
+import AuthGate from "./components/AuthGate"
 
 export const metadata = {
   title: 'Basket Spreadsheet SC',
@@ -20,7 +21,7 @@ export default function RootLayout({ children }) {
       <body className="antialiased h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden">
         <div id="root" className="h-[100dvh] flex flex-col">
           <PwaProvider />
-          {children}
+          <AuthGate>{children}</AuthGate>
         </div>
       </body>
     </html>

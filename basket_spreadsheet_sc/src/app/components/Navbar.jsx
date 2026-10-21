@@ -1,25 +1,28 @@
-import React from 'react';
-import { Moon, Sun, Table2 } from 'lucide-react';
+"use client"
+import { Moon, Sun } from 'lucide-react';
+import logo from '../../assets/logo_cabl.jpeg';
 
 export default function Navbar({ isDarkMode, toggleTheme }) {
   return (
     <nav className="flex items-center justify-between p-4 border-b border-blue-50 dark:border-gray-800 bg-white dark:bg-black">
-      <div className="flex items-center gap-2">
-        <div className="bg-blue-500 text-white p-1.5 rounded-lg">
-          <Table2 size={20} />
-        </div>
-        <span className="font-bold text-lg text-gray-900 dark:text-white">
-          PlanillaApp
+      <div className="flex items-center gap-3 min-w-0">
+        <img
+          src={logo.src}
+          alt="Logo CABL"
+          className="h-15 w-20 shrink-0 rounded-lg object-contain"
+        />
+        <span className="font-bold text-sm sm:text-lg text-gray-900 dark:text-white leading-tight">
+          CABL planilla de baloncesto
         </span>
       </div>
 
-      <button
+      {/*<button
         onClick={toggleTheme}
-        className="p-2 rounded-xl border border-blue-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors"
+        className="ml-3 shrink-0 p-2 rounded-xl border border-blue-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors"
         aria-label="Alternar tema"
       >
         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
+      </button>*/}
     </nav>
   );
 }

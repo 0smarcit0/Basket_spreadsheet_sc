@@ -1,17 +1,17 @@
-/* eslint-disable no-restricted-globals */
 
 // ============================================================
 // CONFIG
 // ============================================================
-const VERSION = "v1"; // súbelo (v2, v3...) para invalidar todos los caches
+const VERSION = "v2"; // súbelo (v2, v3...) para invalidar todos los caches
 
 // Rutas a precachear al instalar el SW (añade las tuyas)
 const PRECACHE_ROUTES = [
   "/",
   "/new_planilla",
-  "/search_planillas",
+  "/continue_planilla",
   "/torneos",
   "/offline",
+  "/login"
 ];
 
 // Archivos extra a precachear

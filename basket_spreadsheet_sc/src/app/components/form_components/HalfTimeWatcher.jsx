@@ -10,7 +10,7 @@ export default function HalftimeWatcher({ getValues, groups }) {
   const captureHalftimeBoundary = useMatchStore((state) => state.captureHalftimeBoundary)
 
   const previousQuarterRef = useRef(quarter)
-  const capturedRef = useRef(false)
+  const capturedRef = useRef(useMatchStore.getState().halftimeCaptured)
 
   useEffect(() => {
     const previousQuarter = previousQuarterRef.current

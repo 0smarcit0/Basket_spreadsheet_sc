@@ -1,6 +1,6 @@
 "use client"
 import { useFormContext, useController } from "react-hook-form"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 
 export default function TimeoutBox({ group, color, boxid, isVoid, disabled }) {
   const { control } = useFormContext()
@@ -12,15 +12,20 @@ export default function TimeoutBox({ group, color, boxid, isVoid, disabled }) {
       pattern: { value: /^([0-9]{0,2}|=)$/, message: "Solo números" },
     },
   })
-  const [lockedColor, setLockedColor] = useState(null)
+  const { field: colorField } = useController({
+    name: `${group}.timeoutColors.${boxid}`,
+    control,
+    defaultValue: "",
+  })
 
-  // El color se fija al escribir y se libera si se borra el valor
+  // El color se fija al escribir y se libera si se borra el valor.
+  // Si ya viene un color guardado (planilla cargada), se respeta.
   useEffect(() => {
     const hasValue = field.value !== undefined && field.value !== "" && field.value !== null
-    if (hasValue && lockedColor === null) {
-      setLockedColor(color)
-    } else if (!hasValue && lockedColor !== null) {
-      setLockedColor(null)
+    if (hasValue && !colorField.value) {
+      colorField.onChange(color)
+    } else if (!hasValue && colorField.value) {
+      colorField.onChange("")
     }
   }, [field.value])
 
@@ -40,7 +45,7 @@ export default function TimeoutBox({ group, color, boxid, isVoid, disabled }) {
         inputMode="numeric"
         maxLength={2}
         className={`box-border h-full w-full border-2 border-black bg-transparent text-center leading-none
-                    focus:bg-yellow-50 focus:outline-none ${lockedColor ?? color}`}
+                    focus:bg-yellow-50 focus:outline-none ${colorField.value || color}`}
         name={field.name}
         value={field.value ?? ""}
         onChange={handleChange}
