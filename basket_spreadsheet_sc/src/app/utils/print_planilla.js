@@ -1,10 +1,35 @@
 "use client"
 import html2canvas from "html2canvas-pro"
 
-// Detecta teléfono/tablet (incluye iPadOS, que se reporta como "Macintosh")
+// Dispositivo táctil como entrada principal (teléfonos y tablets,
+// incluso cuando el navegador está en "sitio de escritorio")
+const hasCoarsePointer = () =>
+    typeof window !== "undefined" &&
+    !!window.matchMedia?.("(pointer: coarse)").matches &&
+    navigator.maxTouchPoints > 0
+
+// ¿El navegador puede compartir archivos? (requiere HTTPS o localhost)
+export const canShareFiles = () => {
+    if (typeof navigator === "undefined" || !navigator.canShare) return false
+    try {
+        const probe = new File(["x"], "x.png", { type: "image/png" })
+        return navigator.canShare({ files: [probe] })
+    } catch {
+        return false
+    }
+}
+
+// Detecta teléfono/tablet por capacidades, con el user agent solo como respaldo
 export const isMobileOrTablet = () => {
     if (typeof navigator === "undefined") return false
 
+    // 1) Chromium moderno lo informa directamente
+    if (navigator.userAgentData?.mobile) return true
+
+    // 2) Táctil + puede compartir archivos: cubre tablets en modo escritorio e iPadOS
+    if (hasCoarsePointer() && canShareFiles()) return true
+
+    // 3) Respaldo por user agent (incluye iPadOS, que se reporta como "Macintosh")
     const ua = navigator.userAgent
     const isMobileUA = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)
     const isIPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1

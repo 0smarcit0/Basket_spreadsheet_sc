@@ -6,7 +6,7 @@ import { useMatchStore } from "../../utils/store/matchStore"
 
 function getColorForQuarter(quarter) {
   if (quarter === 1 || quarter === 3) return "red"
-  return "black"
+  return "black" // incluye quarter 0 (antes de comenzar)
 }
 
 const COLOR_CLASSES = {
@@ -14,27 +14,31 @@ const COLOR_CLASSES = {
   black: "text-black",
 }
 
+// Formato del valor: "tipo:color" o "starter:color:pre"
+// "pre" = titular marcado antes de comenzar el partido
 function parseValue(value) {
-  if (!value) return { type: "", color: null }
-  const [type, color] = value.split(":")
-  return { type, color: color || "black" } 
+  if (!value) return { type: "", color: null, pre: false }
+  const [type, color, flag] = value.split(":")
+  return { type, color: color || "black", pre: flag === "pre" }
 }
 
-function Icon({ type, color }) {
+function Icon({ type, color, pre = false }) {
   if (!type) return null
-  const colorClass = COLOR_CLASSES[color] || "text-black"
+  const xColor = COLOR_CLASSES[color] || "text-black"
 
   if (type === "starter") {
+    // Titular de pre-partido: círculo rojo fijo. Los demás: círculo negro.
+    const circleColor = pre ? COLOR_CLASSES.red : COLOR_CLASSES.black
     return (
       <span className="relative w-4 h-4 flex items-center justify-center">
-        <Circle className="absolute w-4 h-4 text-black" strokeWidth={2} />
-        <X className={`w-2.5 h-2.5 ${colorClass}`} strokeWidth={3} />
+        <Circle className={`absolute w-4 h-4 ${circleColor}`} strokeWidth={2} />
+        <X className={`w-2.5 h-2.5 ${xColor}`} strokeWidth={3} />
       </span>
     )
   }
 
   if (type === "sub") {
-    return <X className={`w-3.5 h-3.5 ${colorClass}`} strokeWidth={3} />
+    return <X className={`w-3.5 h-3.5 ${xColor}`} strokeWidth={3} />
   }
 
   return null
@@ -57,15 +61,18 @@ export default function PlayerInToggle({ group, index, disabled = false }) {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  const { type: currentType, color: currentColor } = parseValue(field.value)
+  const { type: currentType, color: currentColor, pre: currentPre } = parseValue(field.value)
 
   const liveColor = getColorForQuarter(quarter)
+  const isPregame = quarter === 0
 
   const handleSelect = (optionType) => {
     if (optionType === "") {
       field.onChange("")
     } else {
-      field.onChange(`${optionType}:${liveColor}`)
+      // Solo un titular marcado con el partido sin comenzar lleva la marca "pre"
+      const pre = isPregame && optionType === "starter"
+      field.onChange(`${optionType}:${liveColor}${pre ? ":pre" : ""}`)
     }
     setOpen(false)
   }
@@ -79,7 +86,7 @@ export default function PlayerInToggle({ group, index, disabled = false }) {
         className="w-6 h-6 flex items-center justify-center"
         title="Selecciona: vacío / titular / entra por cambio"
       >
-        <Icon type={currentType} color={currentColor} />
+        <Icon type={currentType} color={currentColor} pre={currentPre} />
       </button>
 
       {open && !disabled && (
@@ -95,7 +102,7 @@ export default function PlayerInToggle({ group, index, disabled = false }) {
             onClick={() => handleSelect("starter")}
             className="w-7 h-7 flex items-center justify-center hover:bg-gray-100"
           >
-            <Icon type="starter" color={liveColor} />
+            <Icon type="starter" color={liveColor} pre={isPregame} />
           </button>
           <button
             type="button"

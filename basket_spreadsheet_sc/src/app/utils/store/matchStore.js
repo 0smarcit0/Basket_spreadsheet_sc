@@ -16,6 +16,7 @@ const markOvertimeEntry = (state) => {
   if (state.teamBcurrentScore > 0) next.B[state.teamBcurrentScore] = true;
   return next;
 };
+
 const getInitialState = () => ({
   quarter: 0,
   previousQuarter: 0,

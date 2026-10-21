@@ -9,6 +9,7 @@ const ROWS = Array.from({ length: 12 }, (_, i) => i + 4);
 const FIRST_FOUL_CELL = 4;
 const LAST_FOUL_CELL = 8;
 
+
 export default function RosterTable({ group }) {
   const { register, getValues } = useFormContext();
   const team = group === "teamA" ? "A" : "B";
@@ -30,7 +31,6 @@ export default function RosterTable({ group }) {
     return last;
   };
 
-  // null = partido sin comenzar. Si ya comenzó (planilla cargada), se calcula de inmediato.
   const [lastFilledIndex, setLastFilledIndex] = useState(() =>
     matchStarted ? computeLastFilledIndex() : null,
   );
@@ -40,7 +40,6 @@ export default function RosterTable({ group }) {
     setLastFilledIndex(matchStarted ? computeLastFilledIndex() : null);
   }, [matchStarted]);
 
-  // Mide el DOM real y arma la polilínea: horizontal + diagonal
   useLayoutEffect(() => {
     const hasEmptyRows =
       !isAbsent &&
