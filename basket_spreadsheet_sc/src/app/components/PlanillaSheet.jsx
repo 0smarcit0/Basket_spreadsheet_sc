@@ -80,7 +80,14 @@ export default function FormPlanilla({initialMode="new"}) {
     }
 
     const handlePrint = () => generateAndDeliver()
+    // Debe ejecutarse directo desde el onClick, sin await previo (requisito de navigator.share)
+    const handleSharePending = () => {
+      if (pendingFile) sharePlanillaFile(pendingFile)
+    }
 
+    const handleDownloadPending = () => {
+      if (pendingFile) downloadFile(pendingFile)
+    }
     useEffect(() => {
         const justEnded = !prevGameEnded.current && gameEnded
         prevGameEnded.current = gameEnded
@@ -495,6 +502,38 @@ export default function FormPlanilla({initialMode="new"}) {
                   footer={modalFooter}
                 >
                   <p>{modalMessage}</p>
+                </Modal>
+              )}
+              {pendingFile && (
+                <Modal
+                  open
+                  onClose={() => setPendingFile(null)}
+                  title="Planilla lista"
+                  size="sm"
+                  footer={
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleDownloadPending}
+                        className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                      >
+                        Descargar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSharePending}
+                        className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                      >
+                        Compartir
+                      </button>
+                    </>
+                  }
+                >
+                  <p>
+                    La imagen de la planilla ya se generó. Toque «Compartir»
+                    para guardarla o enviarla, o «Descargar» para guardarla en
+                    el dispositivo.
+                  </p>
                 </Modal>
               )}
             </div>
