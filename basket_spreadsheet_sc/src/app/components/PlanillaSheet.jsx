@@ -8,7 +8,7 @@ import RunningScoreForm from "../components/sub_forms/RunningScoreForm";
 import HalftimeWatcher from "../components/form_components/HalfTimeWatcher";
 import ScoresForm from "../components/sub_forms/ScoreForm";
 import { useMatchStore } from "../utils/store/matchStore";
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { generateFinalMatchReportFile } from "../utils/gameReport"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import Modal from "../components/Modal"
@@ -54,6 +54,7 @@ export default function FormPlanilla({initialMode="new"}) {
     const endByForfeit = useMatchStore((state) => state.endByForfeit)
     const [forfeitMenuOpen, setForfeitMenuOpen] = useState(false)
     const forfeitMenuRef = useRef(null)
+    const router = useRouter()
 
     const generateAndDeliver = async () => {
         if (generating) return
@@ -153,6 +154,48 @@ export default function FormPlanilla({initialMode="new"}) {
       setModalMessage(message);
       setModalFooter(footer);
       setOpen(true);
+    };
+    const goHome = () => {
+      setOpen(false);
+      router.push("/");
+    };
+
+    const saveAndGoHome = () => {
+      try {
+        // getValues evita la validación: se guarda igual que cuando falla onInvalid
+        saveSheet(methods.getValues(), useMatchStore.getState());
+      } catch (err) {
+        console.error(err);
+        showModal(
+          "Error",
+          "No se pudo guardar la información de la planilla. Se permanece en la planilla.",
+        );
+        return;
+      }
+      goHome();
+    };
+
+    const handleHomeClick = () => {
+      showModal(
+        "Volver al inicio",
+        "¿Desea guardar el estado actual de la planilla antes de salir? Se reemplazará la última planilla guardada.",
+        <>
+          <button
+            type="button"
+            onClick={goHome}
+            className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+          >
+            No guardar
+          </button>
+          <button
+            type="button"
+            onClick={saveAndGoHome}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Guardar y salir
+          </button>
+        </>,
+      );
     };
 
     const countStarters = (team) => {
@@ -296,13 +339,14 @@ export default function FormPlanilla({initialMode="new"}) {
               style={{ width: SHEET_WIDTH }}
             >
               <div className="  flex items-center gap-3 z-20">
-                <Link
-                  href="/"
-                  className="flex w-fit items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 sm:text-base"
+                <button
+                  type="button"
+                  onClick={handleHomeClick}
+                  className="flex w-fit cursor-pointer items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 sm:text-base"
                 >
                   <ArrowLeft size={16} className="mr-1" />
                   Inicio
-                </Link>
+                </button>
 
                 <span className="h-5 w-px bg-gray-300 dark:bg-gray-700" />
 
