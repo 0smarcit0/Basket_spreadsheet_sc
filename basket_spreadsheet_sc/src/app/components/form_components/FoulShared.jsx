@@ -1,5 +1,5 @@
 "use client"
-import { useController } from "react-hook-form"
+import { useController, useFormContext } from "react-hook-form"
 import { useState, useMemo } from "react"
 import { useMatchStore } from "../../utils/store/matchStore"
 import Modal from "../Modal" 
@@ -15,9 +15,10 @@ export const COLOR_CLASSES = {
 }
 
 export function parseValue(value) {
-  if (!value) return { type: "", color: null }
-  const [type, color] = value.split(":")
-  return { type, color: color || "black" }
+  if (!value) return { type: "", color: null, q: null }
+  const [type, color, tag] = value.split(":")
+  const q = /^q\d$/.test(tag ?? "") ? Number(tag.slice(1)) : null
+  return { type, color: color || "black", q }
 }
 
 export function FoulLabel({ type, color, types, size = "text-xs" }) {
@@ -53,16 +54,82 @@ export function FoulLabel({ type, color, types, size = "text-xs" }) {
   )
 }
 
+const TEAM_FOUL_BOXES = 4 // casillas por cuarto en los fouls colectivos
+const TEAM_FOUL_PERIODS = 4 // la planilla no tiene casillas para OT
+const PLAYER_CELL_RE = /^(team[AB])\.players\.\d+\.fouls\.\d+$/
+
+// Marca la primera casilla libre del cuarto
+function markTeamFoul(group, period, getValues, setValue) {
+  for (let i = 0; i < TEAM_FOUL_BOXES; i++) {
+    const box = `${group}.fouls.p${period}.${i}`
+    if (!getValues(box)) {
+      setValue(box, "x")
+      return
+    }
+  }
+}
+
+// Desmarca la última casilla con "x" del cuarto
+function unmarkTeamFoul(group, period, getValues, setValue) {
+  for (let i = TEAM_FOUL_BOXES - 1; i >= 0; i--) {
+    const box = `${group}.fouls.p${period}.${i}`
+    if (getValues(box) === "x") {
+      setValue(box, "")
+      return
+    }
+  }
+}
+
+// Faltas de jugadores de ese equipo marcadas en ese cuarto
+function countTeamFouls(group, period, getValues) {
+  const players = getValues(`${group}.players`) || []
+  let n = 0
+  for (const p of players) {
+    for (const v of Object.values(p?.fouls ?? {})) {
+      if (parseValue(v).q === period) n++
+    }
+  }
+  return n
+}
+
+
 function FoulPicker({ field, types, flatTypes, disabled = false, className = "" }) {
   const gameEnded = useMatchStore((s) => s.gameEnded)
   const quarter = useMatchStore((s) => s.quarter)
+  const { getValues, setValue } = useFormContext()
   const [open, setOpen] = useState(false)
 
   const { type: currentType, color: currentColor } = parseValue(field.value)
   const liveColor = getColorForQuarter(quarter)
 
   const handleSelect = (optionValue) => {
-    field.onChange(optionValue === "" ? "" : `${optionValue}:${liveColor}`)
+    const prev = parseValue(field.value)
+    const wasFilled = !!field.value
+    const isFilled = optionValue !== ""
+
+    // Cuarto en que se marcó la falta; al editarla se conserva el original
+    const tag = wasFilled
+      ? prev.q ? `:q${prev.q}` : ""
+      : quarter >= 1 ? `:q${quarter}` : ""
+
+    // Sincroniza con los fouls colectivos (solo faltas de jugadores)
+    const match = field.name.match(PLAYER_CELL_RE)
+    if (match) {
+      const group = match[1]
+      if (!wasFilled && isFilled) {
+        if (quarter >= 1 && quarter <= TEAM_FOUL_PERIODS) {
+          markTeamFoul(group, quarter, getValues, setValue)
+        }
+      } else if (wasFilled && !isFilled && prev.q >= 1 && prev.q <= TEAM_FOUL_PERIODS) {
+        // Se cuenta antes de limpiar el campo, por eso el -1
+        const remaining = countTeamFouls(group, prev.q, getValues) - 1
+        if (remaining < TEAM_FOUL_BOXES) {
+          unmarkTeamFoul(group, prev.q, getValues, setValue)
+        }
+      }
+    }
+
+    field.onChange(isFilled ? `${optionValue}:${liveColor}${tag}` : "")
     setOpen(false)
   }
 
