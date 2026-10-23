@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link"
 import { useState,useEffect,useRef } from "react"
 import { useForm, FormProvider } from "react-hook-form"
 import FormHeadInputs from "../components/sub_forms/FormHeadInputs";
@@ -8,13 +9,13 @@ import RunningScoreForm from "../components/sub_forms/RunningScoreForm";
 import HalftimeWatcher from "../components/form_components/HalfTimeWatcher";
 import ScoresForm from "../components/sub_forms/ScoreForm";
 import { useMatchStore } from "../utils/store/matchStore";
-import { useRouter } from "next/navigation"
 import { generateFinalMatchReportFile } from "../utils/gameReport"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import Modal from "../components/Modal"
 import SheetBanner, {BANNER_HEIGHT} from "../components/sub_forms/SheetBanner"
 import {generatePlanillaFile,downloadFile,sharePlanillaFile,isMobileOrTablet,} from "../utils/print_planilla"
 import { saveSheet, loadSheet } from "../utils/saveSheet"
+import useAutosave from "../utils/hooks/useAutosave"
 const SHEET_WIDTH = 1120
 const SHEET_HEIGHT = 1375 + BANNER_HEIGHT
 
@@ -54,8 +55,12 @@ export default function FormPlanilla({initialMode="new"}) {
     const endByForfeit = useMatchStore((state) => state.endByForfeit)
     const [forfeitMenuOpen, setForfeitMenuOpen] = useState(false)
     const forfeitMenuRef = useRef(null)
-    const router = useRouter()
+    const autosave = useAutosave(methods, ready)
 
+
+
+
+    useMatchStore.getState
     const generateAndDeliver = async () => {
         if (generating) return
         setGenerating(true)
@@ -90,15 +95,6 @@ export default function FormPlanilla({initialMode="new"}) {
     useEffect(() => {
         const justEnded = !prevGameEnded.current && gameEnded
         prevGameEnded.current = gameEnded
-
-        if (!justEnded) return
-
-   
-        const timer = setTimeout(() => {
-            generateAndDeliver()
-        }, 400)
-
-        return () => clearTimeout(timer)
     }, [gameEnded])
 
 
@@ -160,43 +156,6 @@ export default function FormPlanilla({initialMode="new"}) {
       router.push("/");
     };
 
-    const saveAndGoHome = () => {
-      try {
-        // getValues evita la validación: se guarda igual que cuando falla onInvalid
-        saveSheet(methods.getValues(), useMatchStore.getState());
-      } catch (err) {
-        console.error(err);
-        showModal(
-          "Error",
-          "No se pudo guardar la información de la planilla. Se permanece en la planilla.",
-        );
-        return;
-      }
-      goHome();
-    };
-
-    const handleHomeClick = () => {
-      showModal(
-        "Volver al inicio",
-        "¿Desea guardar el estado actual de la planilla antes de salir? Se reemplazará la última planilla guardada.",
-        <>
-          <button
-            type="button"
-            onClick={goHome}
-            className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
-          >
-            No guardar
-          </button>
-          <button
-            type="button"
-            onClick={saveAndGoHome}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Guardar y salir
-          </button>
-        </>,
-      );
-    };
 
     const countStarters = (team) => {
       const players = methods.getValues(`team${team}.players`) || [];
@@ -256,6 +215,32 @@ export default function FormPlanilla({initialMode="new"}) {
 
     const handleQuarterChange = (newQuarter) => {
         if(quarter === 0 && newQuarter === 1) {
+          const playersA = methods.getValues("teamA.players") || []
+          const playersB = methods.getValues("teamB.players") || []
+          let setA = new Set()
+          let setB =  new Set()
+          let hasduplicate = false
+          for (let i = 0; i < 12; i++) {
+            let numeroA = playersA[i]?.number ?? null
+            let numeroB = playersB[i]?.number ?? null
+            console.log(typeof(numeroA))
+            console.log(typeof(numeroB))
+            if(setA.has(numeroA) && numeroA !== "" || setB.has(numeroB) && numeroB !== ""){
+              hasduplicate = true
+              i=12
+            }else{
+              setA.add(numeroA)
+              setB.add(numeroB)
+            }
+            
+          }
+
+          if (hasduplicate) {
+            setModalTitle("Advertencia!")
+            setModalMessage("No se ha podido comenzar el partido, hay jugadores dentro del mismo equipo con dorsales iguales")
+            setModalFooter(null)
+            setOpen(true)
+          }else{
             setModalTitle("Confirmación de inicio de partido")
             setModalMessage("¿Está seguro que desea comenzar el partido? Una vez iniciado, no podrá agregar más jugadores.")
             setModalFooter((<button
@@ -266,6 +251,10 @@ export default function FormPlanilla({initialMode="new"}) {
                                 Proceder
                             </button>))
             setOpen(true)
+          }
+          
+          
+            
         }else if(newQuarter > quarter + 1){
             setModalTitle("Advertencia")
             setModalMessage("No puede saltar cuartos. Debe avanzar de uno en uno.")
@@ -321,6 +310,18 @@ export default function FormPlanilla({initialMode="new"}) {
       }
     };
 
+    useEffect(() => {
+      if (!ready) return;
+      const warn = (e) => {
+        const { gameEnded } = useMatchStore.getState();
+        if ( gameEnded) return; // sin partido en curso, no estorba
+        e.preventDefault();
+        e.returnValue = "";
+      };
+      window.addEventListener("beforeunload", warn);
+      return () => window.removeEventListener("beforeunload", warn);
+    }, [ready]);
+
  
 
 
@@ -339,14 +340,13 @@ export default function FormPlanilla({initialMode="new"}) {
               style={{ width: SHEET_WIDTH }}
             >
               <div className="  flex items-center gap-3 z-20">
-                <button
-                  type="button"
-                  onClick={handleHomeClick}
-                  className="flex w-fit cursor-pointer items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 sm:text-base"
+                <Link
+                  href="/"
+                  className="flex w-fit items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 sm:text-base"
                 >
                   <ArrowLeft size={16} className="mr-1" />
                   Inicio
-                </button>
+                </Link>
 
                 <span className="h-5 w-px bg-gray-300 dark:bg-gray-700" />
 

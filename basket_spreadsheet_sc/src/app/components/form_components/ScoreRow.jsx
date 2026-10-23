@@ -93,6 +93,7 @@ function ScoreRow({ team, value, name, players }) {
     isFinal={isFinal}
   />
 );
+
   const selectCell = (
     <DorsalSelect
       key="select"

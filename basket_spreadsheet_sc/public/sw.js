@@ -2,7 +2,7 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const VERSION = "v2"; // súbelo (v2, v3...) para invalidar todos los caches
+const VERSION = "v3"; // súbelo (v2, v3...) para invalidar todos los caches
 
 // Rutas a precachear al instalar el SW (añade las tuyas)
 const PRECACHE_ROUTES = [
