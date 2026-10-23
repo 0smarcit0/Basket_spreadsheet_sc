@@ -122,6 +122,7 @@ export default function RosterTable({ group }) {
         </thead>
         <tbody ref={tbodyRef}>
           {ROWS.map((rowNumber, index) => (
+            
             <PlayerRow
               key={rowNumber}
               group={group}

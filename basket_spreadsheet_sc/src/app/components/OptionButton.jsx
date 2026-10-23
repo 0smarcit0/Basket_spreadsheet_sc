@@ -2,9 +2,10 @@ import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import  Link from 'next/link';
 
-export default function OptionButton({ title, description, icon: Icon, path, isActive }) {
+export default function OptionButton({ title, description, icon: Icon, path, isActive, onclick }) {
   return (
     <Link
+      onClick = {onclick}
       href={path}
       className={`w-full flex items-center p-4 rounded-2xl text-left transition-all duration-300 group
         ${isActive 

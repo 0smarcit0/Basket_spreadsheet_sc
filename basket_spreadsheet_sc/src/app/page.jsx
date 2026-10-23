@@ -1,11 +1,16 @@
 "use client";
 import {useState, useEffect} from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Menu, Search, CircleQuestionMark, Settings, Trophy } from 'lucide-react';
 import Navbar from './components/Navbar';
 import OptionButton from './components/OptionButton';
+import Modal from './components/Modal';
+import { loadSheet } from './utils/saveSheet';
 
 export default function App() {
+    const router = useRouter();
     const [isDarkMode, setIsDarkMode] = useState(false);
+    const [confirmNewOpen, setConfirmNewOpen] = useState(false);
 
     useEffect(() => {
       if (isDarkMode) {
@@ -16,6 +21,19 @@ export default function App() {
         document.documentElement.classList.remove('dark');
       }
     }, [isDarkMode]);
+
+    // Si ya hay una planilla guardada, frena la navegación y pide confirmación.
+    // Si no hay nada guardado, el Link navega normalmente.
+    const handleNewSheetClick = (e) => {
+      if (!loadSheet()) return;
+      e.preventDefault();
+      setConfirmNewOpen(true);
+    };
+
+    const confirmNewSheet = () => {
+      setConfirmNewOpen(false);
+      router.push('/new_planilla');
+    };
 
   return (
     <div className="min-h-screen bg-white dark:bg-black font-sans transition-colors duration-300 flex flex-col">
@@ -41,6 +59,7 @@ export default function App() {
               description="Crear un nuevo registro desde cero"
               icon={Plus}
               path="/new_planilla"
+              onclick={handleNewSheetClick}
             />
 
             <OptionButton
@@ -87,6 +106,36 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      <Modal
+        open={confirmNewOpen}
+        onClose={() => setConfirmNewOpen(false)}
+        title="Advertencia"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setConfirmNewOpen(false)}
+              className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmNewSheet}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Continuar
+            </button>
+          </>
+        }
+      >
+        <p>
+          Ya existe una planilla guardada. Si continúa, se sobrescribirá en
+          cuanto empiece a modificar la nueva planilla.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -19,8 +19,8 @@ export const saveSheet = (formData, storeState) => {
 export const loadSheet = () => {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
-    return raw ? JSON.parse(raw) : null
+    return raw ? JSON.parse(raw) : false
   } catch {
-    return null
+    return false
   }
 }
