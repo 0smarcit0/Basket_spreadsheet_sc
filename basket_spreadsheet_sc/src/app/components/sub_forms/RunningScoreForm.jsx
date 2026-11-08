@@ -1,7 +1,9 @@
 import ScoreColumn from "../form_components/ScoreColumn"
+import ModifyScoreModal from "../form_components/ModifyScoreModal"
 import { useFormContext } from "react-hook-form"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMatchStore } from "../../utils/store/matchStore"; 
+
 export function useTeamPlayers(team) {
   const { watch, getValues } = useFormContext();
   const quarter = useMatchStore((state) => state.quarter); 
@@ -46,9 +48,21 @@ export function useTeamPlayers(team) {
   return players;
 }
 
+const COLUMN_RANGES = [[1, 40], [41, 80], [81, 120], [121, 160]]
+
 export default function RunningScoreForm() {
     const playersA = useTeamPlayers("A")
     const playersB = useTeamPlayers("B")
+
+    // Canasta que se está modificando: { team, row } o null
+    const [target, setTarget] = useState(null)
+
+    // Estable (useCallback) para no romper el memo de ScoreRow
+    const handleModify = useCallback((team, row) => {
+        if (useMatchStore.getState().gameEnded) return
+        setTarget({ team, row })
+    }, [])
+    const closeModify = useCallback(() => setTarget(null), [])
    
     return(
      <div >
@@ -56,23 +70,14 @@ export default function RunningScoreForm() {
             <p className="text-center font-bold border-r border-l" style={{fontSize:20}}>Running Score</p>
         </div>
         <div className="flex flex-row border border-b-2">
-            <div className="flex flex-row " >
-                <ScoreColumn team="A" range={[1,40]} players={playersA} />
-                <ScoreColumn team="B" range={[1,40]} players={playersB}/>
-            </div>
-            
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[41,80]} players={playersA}/>
-                <ScoreColumn team="B" range={[41,80]} players={playersB}/>
-            </div>
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[81,120]} players={playersA}/>
-                <ScoreColumn team="B" range={[81,120]} players={playersB}/>
-            </div>
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[121,160]} players={playersA}/>
-                <ScoreColumn team="B" range={[121,160]} players={playersB}/>
-            </div>
+            {COLUMN_RANGES.map((range) => (
+                <div key={range[0]} className="flex flex-row">
+                    <ScoreColumn team="A" range={range} players={playersA} handleModify={handleModify} />
+                    <ScoreColumn team="B" range={range} players={playersB} handleModify={handleModify} />
+                </div>
+            ))}
         </div>
+
+        <ModifyScoreModal target={target} onClose={closeModify} />
     </div>)
 }

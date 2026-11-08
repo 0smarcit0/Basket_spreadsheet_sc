@@ -82,12 +82,12 @@ export default function App() {
               icon={CircleQuestionMark}
               path="/search_planillas"
             />*/}
-            {/*<OptionButton
+            {<OptionButton
               title="Configuración"
-              description="Personaliza tu experiencia y ajusta preferencias"
+              description="Exporta e importa datos"
               icon={Settings}
-              path="/search_planillas"
-            />*/}
+              path="/settings"
+            />}
             <OptionButton
               title="Torneos"
               description="Gestionar torneos y competencias"

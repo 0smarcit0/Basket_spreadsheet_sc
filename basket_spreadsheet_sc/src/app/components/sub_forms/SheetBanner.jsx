@@ -278,8 +278,17 @@ function HeaderPickerInput({ name, partsName, defaultParts, placeholder, title, 
 
 
 export default function SheetBanner() {
-    const { register, formState: { errors } } = useFormContext()
+    const { control, formState: { errors } } = useFormContext()
     const { torneos } = useTorneos()
+    const { field: tournamentField } = useController({
+        name: "tournament",
+        control,
+        defaultValue: "",
+        rules: { required: "Campo obligatorio" },
+    })
+
+    const nombres = torneos.map((t) => t.nombretorneo)
+    const actual = tournamentField.value ?? ""
 
     return (
         <div className="flex items-center justify-between gap-4" style={{ height: BANNER_HEIGHT }}>
@@ -295,12 +304,13 @@ export default function SheetBanner() {
                 </div>
 
                 <select
-                    defaultValue=""
-                    {...register("tournament", { required: "Campo obligatorio" })}
+                    {...tournamentField}
+                    value={actual}
                     className={`${inputClass} appearance-none rounded-none shadow-none ${errors.tournament ? errorClass : ""}`}
                 >
                     <option value="" disabled>Seleccione un torneo</option>
-                    {torneos.map((nombre) => (
+                    {actual && !nombres.includes(actual) && <option value={actual}>{actual}</option>}
+                    {nombres.map((nombre) => (
                         <option key={nombre} value={nombre}>{nombre}</option>
                     ))}
                 </select>

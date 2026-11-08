@@ -15,7 +15,10 @@ import Modal from "../components/Modal"
 import SheetBanner, {BANNER_HEIGHT} from "../components/sub_forms/SheetBanner"
 import {generatePlanillaFile,downloadFile,sharePlanillaFile,isMobileOrTablet,} from "../utils/print_planilla"
 import { saveSheet, loadSheet } from "../utils/saveSheet"
-import useAutosave from "../utils/hooks/useAutosave"
+//import useAutosave from "../utils/hooks/useAutosave"
+import useTorneos from "../utils/hooks/useTorneos"
+import { IniciarPlanillaModal, aplicarTorneoAPlanilla } from "../components/Torneomodals"
+
 const SHEET_WIDTH = 1120
 const SHEET_HEIGHT = 1375 + BANNER_HEIGHT
 
@@ -55,7 +58,9 @@ export default function FormPlanilla({initialMode="new"}) {
     const endByForfeit = useMatchStore((state) => state.endByForfeit)
     const [forfeitMenuOpen, setForfeitMenuOpen] = useState(false)
     const forfeitMenuRef = useRef(null)
-    const autosave = useAutosave(methods, ready)
+    //const autosave = useAutosave(methods, ready)
+    const { torneos, loaded: torneosLoaded, registrarResultado } = useTorneos()
+    const [elegirTorneo, setElegirTorneo] = useState(false)
 
 
 
@@ -93,9 +98,27 @@ export default function FormPlanilla({initialMode="new"}) {
       if (pendingFile) downloadFile(pendingFile)
     }
     useEffect(() => {
-        const justEnded = !prevGameEnded.current && gameEnded
-        prevGameEnded.current = gameEnded
-    }, [gameEnded])
+      const justEnded = !prevGameEnded.current && gameEnded;
+      prevGameEnded.current = gameEnded;
+      if (!justEnded) return;
+
+      const ref = methods.getValues("torneoRef");
+      if (!ref) return;
+      const { teamAcurrentScore, teamBcurrentScore } = useMatchStore.getState();
+      const forfeit = methods.getValues("forfeit") ?? null
+      registrarResultado(ref.torneo, ref.partidoId, teamAcurrentScore, teamBcurrentScore, forfeit).then((res) => {
+        if (res.ok)
+          showModal(
+            "Resultado registrado",
+            "El resultado del partido se guardó en el torneo.",
+          );
+        else
+          showModal(
+            "Torneo",
+            `No se pudo registrar el resultado en el torneo: ${res.error}`,
+          );
+      });
+    }, [gameEnded]);
 
 
     const doSave = (data) => {
@@ -278,6 +301,7 @@ export default function FormPlanilla({initialMode="new"}) {
         } else {
           useMatchStore.getState().resetMatch();
           prevGameEnded.current = false;
+          setElegirTorneo(true);   
           setModalTitle("Sin planilla guardada");
           setModalMessage(
             "No se encontró una planilla guardada. Se abrió una planilla nueva.",
@@ -288,6 +312,7 @@ export default function FormPlanilla({initialMode="new"}) {
       } else {
         useMatchStore.getState().resetMatch();
         prevGameEnded.current = false;
+        setElegirTorneo(true);  
       }
 
       setReady(true);
@@ -322,9 +347,10 @@ export default function FormPlanilla({initialMode="new"}) {
       return () => window.removeEventListener("beforeunload", warn);
     }, [ready]);
 
- 
-
-
+    const handleIniciarPlanilla = (seleccion) => {
+      if (seleccion) aplicarTorneoAPlanilla(methods.setValue, seleccion)
+      setElegirTorneo(false)
+    }
 
 
 
@@ -399,7 +425,11 @@ export default function FormPlanilla({initialMode="new"}) {
                           key={opt.id}
                           type="button"
                           role="menuitem"
-                          onClick={() => handleForfeit(opt.id)}
+                          onClick={() => {
+                            methods.setValue("forfeit", option);
+                            endByForfeit(option);
+                            setOpen(false);
+                          }}
                           className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
                         >
                           {opt.label}
@@ -468,6 +498,7 @@ export default function FormPlanilla({initialMode="new"}) {
                   <p>{modalMessage}</p>
                 </Modal>
               )}
+
               {pendingFile && (
                 <Modal
                   open
@@ -499,6 +530,13 @@ export default function FormPlanilla({initialMode="new"}) {
                     el dispositivo.
                   </p>
                 </Modal>
+              )}
+              {elegirTorneo && (
+                <IniciarPlanillaModal
+                  torneos={torneos}
+                  loaded={torneosLoaded}
+                  onConfirm={handleIniciarPlanilla}
+                />
               )}
             </div>
           </div>

@@ -4,17 +4,23 @@ import Link from "next/link"
 import { ArrowLeft, Pencil, Trash2, Check, X, Plus } from "lucide-react"
 import Navbar from "../components/Navbar"
 import Modal from "../components/Modal"
+import { CrearTorneoModal, DetalleTorneoModal } from "../components/Torneomodals"
 import useTorneos from "../utils/hooks/useTorneos"
 
 export default function TorneosPage() {
-  const { torneos, loaded, addTorneo, updateTorneo, removeTorneo } = useTorneos()
+  const { torneos, loaded, loadError, addTorneo, renameTorneo, removeTorneo, updateEquipo, addEquipo,
+    iniciarTorneo, generarJornada, finalizarJornada, realizarSorteo } =
+    useTorneos()
 
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [nuevo, setNuevo] = useState("")
   const [error, setError] = useState("")
-  const [editando, setEditando] = useState(null) // nombre que se está editando
+  const [creando, setCreando] = useState(false)
+  const [torneoSel, setTorneoSel] = useState(null) // nombre del torneo abierto
+  const [editando, setEditando] = useState(null) // nombre que se está renombrando
   const [valorEdit, setValorEdit] = useState("")
   const [aBorrar, setABorrar] = useState(null)
+
+  const torneoAbierto = torneos.find((t) => t.nombretorneo === torneoSel)
 
   useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains("dark"))
@@ -26,24 +32,15 @@ export default function TorneosPage() {
     setIsDarkMode(next)
   }
 
-  const handleAdd = (e) => {
-    e.preventDefault()
-    if (!nuevo.trim()) return setError("El nombre no puede estar vacío.")
-    if (!addTorneo(nuevo)) return setError("Ese torneo ya existe.")
-    setNuevo("")
+  const startEdit = (nombre) => {
+    setEditando(nombre)
+    setValorEdit(nombre)
     setError("")
   }
 
-  const startEdit = (t) => {
-    setEditando(t)
-    setValorEdit(t)
-    setError("")
-  }
-
-  const saveEdit = () => {
-    if (!updateTorneo(editando, valorEdit)) {
-      return setError("Nombre vacío o ya existente.")
-    }
+  const saveEdit = async () => {
+    const res = await renameTorneo(editando, valorEdit)
+    if (!res.ok) return setError(res.error)
     setEditando(null)
     setError("")
   }
@@ -51,6 +48,12 @@ export default function TorneosPage() {
   const cancelEdit = () => {
     setEditando(null)
     setError("")
+  }
+
+  const confirmarBorrado = async () => {
+    const res = await removeTorneo(aBorrar)
+    setError(res.ok ? "" : res.error)
+    setABorrar(null)
   }
 
   return (
@@ -66,38 +69,30 @@ export default function TorneosPage() {
           Inicio
         </Link>
 
-        <h1 className="mb-4 text-2xl font-bold text-gray-800 dark:text-gray-100">
-          Torneos
-        </h1>
-
-        {/* Crear */}
-        <form onSubmit={handleAdd} className="mb-2 flex gap-2">
-          <input
-            type="text"
-            value={nuevo}
-            onChange={(e) => setNuevo(e.target.value)}
-            placeholder="Nombre del torneo"
-            className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-          />
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Torneos</h1>
           <button
-            type="submit"
-            className="flex items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            type="button"
+            onClick={() => setCreando(true)}
+            disabled={!!loadError}
+            className="flex items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            <Plus size={16} /> Agregar
+            <Plus size={16} /> Nuevo torneo
           </button>
-        </form>
+        </div>
+
+        {loadError && <p className="mb-2 text-sm text-red-600">{loadError}</p>}
         {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
 
-        {/* Listar */}
         {!loaded ? null : torneos.length === 0 ? (
           <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Aún no hay torneos. Agrega el primero arriba.
+            Aún no hay torneos. Crea el primero con «Nuevo torneo».
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-gray-200 rounded-md bg-white shadow-sm dark:divide-gray-800 dark:bg-gray-950">
             {torneos.map((t) => (
-              <li key={t} className="flex items-center gap-2 px-3 py-2">
-                {editando === t ? (
+              <li key={t.nombretorneo} className="flex items-center gap-2 px-3 py-2">
+                {editando === t.nombretorneo ? (
                   <>
                     <input
                       autoFocus
@@ -120,12 +115,21 @@ export default function TorneosPage() {
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-100">{t}</span>
-                    <button type="button" onClick={() => startEdit(t)} aria-label="Editar"
+                    <button
+                      type="button"
+                      onClick={() => setTorneoSel(t.nombretorneo)}
+                      className="flex-1 text-left text-sm text-gray-800 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                    >
+                      {t.nombretorneo}
+                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                        {t.equipos.length} {t.equipos.length === 1 ? "equipo" : "equipos"}
+                      </span>
+                    </button>
+                    <button type="button" onClick={() => startEdit(t.nombretorneo)} aria-label="Renombrar"
                       className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">
                       <Pencil size={16} />
                     </button>
-                    <button type="button" onClick={() => setABorrar(t)} aria-label="Eliminar"
+                    <button type="button" onClick={() => setABorrar(t.nombretorneo)} aria-label="Eliminar"
                       className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-gray-800">
                       <Trash2 size={16} />
                     </button>
@@ -137,6 +141,21 @@ export default function TorneosPage() {
         )}
       </main>
 
+      {creando && <CrearTorneoModal onClose={() => setCreando(false)} onCreate={addTorneo} />}
+
+      {torneoAbierto && (
+        <DetalleTorneoModal
+          torneo={torneoAbierto}
+          onClose={() => setTorneoSel(null)}
+          onUpdateEquipo={updateEquipo}
+          onAddEquipo={addEquipo}
+          onIniciarTorneo={iniciarTorneo}
+          onGenerarJornada={generarJornada}
+          onFinalizarJornada={finalizarJornada}
+          onRealizarSorteo={realizarSorteo}
+        />
+      )}
+
       {aBorrar && (
         <Modal
           open
@@ -146,7 +165,7 @@ export default function TorneosPage() {
           footer={
             <button
               type="button"
-              onClick={() => { removeTorneo(aBorrar); setABorrar(null) }}
+              onClick={confirmarBorrado}
               className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
             >
               Eliminar

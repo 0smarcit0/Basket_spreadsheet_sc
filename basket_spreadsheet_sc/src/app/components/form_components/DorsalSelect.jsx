@@ -3,14 +3,15 @@ import { useFormContext, useController, useWatch } from "react-hook-form";
 import { ROW_HEIGHT } from "./ScoreNumberCell";
 import { useState, useEffect, useMemo } from "react";
 export const SELECT_CELL_WIDTH = 40 // px
+import { colorForPeriod } from "./ScoreRow"
+
 
 export default function DorsalSelect({ gname, players = [], color, handleChange }) {
     const { control } = useFormContext();
     const [lockedColor, setLockedColor] = useState(null)
     const name = `${gname}.dorsal`
-
     const { field } = useController({ name, control })
-    const points = useWatch({ control, name: `${gname}.points` }) 
+    const [points, period] = useWatch({ control, name: [`${gname}.points`, `${gname}.period`] })
 
     useEffect(() => {
         const hasValue = field.value !== undefined && field.value !== "" && field.value !== null;
@@ -21,7 +22,10 @@ export default function DorsalSelect({ gname, players = [], color, handleChange 
         }
     }, [field.value, lockedColor, color]);
 
-    const displayColor = lockedColor ?? color;
+    const displayColor =
+    field.value && field.value !== "=" && period
+        ? colorForPeriod(period)
+        : (lockedColor ?? color)
 
     // Ancho del nombre más largo, para alinear la columna de dorsales
     const nameWidth = useMemo(
