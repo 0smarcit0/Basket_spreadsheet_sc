@@ -13,6 +13,12 @@ const SIZES = {
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
+// [CAMBIO 1] Pila de modales abiertos (el último es el de arriba).
+// Permite modales anidados: solo el de arriba reacciona a Esc/Tab y el
+// scroll del body se bloquea/restaura una sola vez.
+const openStack = []
+let overflowBackup = ""
+
 /**
  * @param {boolean}   open
  * @param {Function}  onClose
@@ -47,12 +53,17 @@ export default function Modal({
   useEffect(() => {
     if (!open) return
 
+    const id = Symbol("modal")
     const previouslyFocused = document.activeElement
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
+    if (openStack.length === 0) {
+      overflowBackup = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+    }
+    openStack.push(id)
     dialogRef.current?.focus()
 
     const handleKeyDown = (e) => {
+      if (openStack[openStack.length - 1] !== id) return // solo el modal de arriba
       if (e.key === "Escape" && closeOnEsc) {
         e.stopPropagation()
         onCloseRef.current?.()
@@ -80,15 +91,16 @@ export default function Modal({
     document.addEventListener("keydown", handleKeyDown)
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
-      document.body.style.overflow = previousOverflow
+      const i = openStack.indexOf(id)
+      if (i !== -1) openStack.splice(i, 1)
+      if (openStack.length === 0) document.body.style.overflow = overflowBackup
       previouslyFocused?.focus?.()
     }
   }, [open, closeOnEsc])
 
   if (!mounted || !open) return null
 
-  // Solo cierra si el toque empezó Y terminó sobre el fondo.
-  // Así, arrastrar para seleccionar texto dentro y soltar fuera no lo cierra.
+  
   const handleOverlayPointerDown = (e) => {
     pressStartedOnOverlay.current = e.target === e.currentTarget
   }
@@ -129,7 +141,7 @@ export default function Modal({
           </div>
         )}
 
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
         {footer && (
           <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">

@@ -14,8 +14,13 @@ import { ArrowLeft, ChevronDown } from "lucide-react"
 import Modal from "../components/Modal"
 import SheetBanner, {BANNER_HEIGHT} from "../components/sub_forms/SheetBanner"
 import {generatePlanillaFile,downloadFile,sharePlanillaFile,isMobileOrTablet,} from "../utils/print_planilla"
-import { saveSheet, loadSheet } from "../utils/saveSheet"
 import useAutosave from "../utils/hooks/useAutosave"
+import useTorneos from "../utils/hooks/useTorneos"
+import { IniciarPlanillaModal, aplicarTorneoAPlanilla } from "../components/Torneomodals"
+import { useSearchParams } from "next/navigation"; 
+import { useRouter } from "next/navigation"
+import { crearArchivoPlanilla, leerArchivoComoJSON, eliminarArchivoPlanilla } from "../utils/planillasIO"
+import { saveSheet, loadSheet, clearSheet } from "../utils/saveSheet"
 const SHEET_WIDTH = 1120
 const SHEET_HEIGHT = 1375 + BANNER_HEIGHT
 
@@ -34,15 +39,11 @@ const FORFEIT_OPTIONS = [
 
 const MIN_STARTERS = 5
 export default function FormPlanilla({initialMode="new"}) {
-    const methods = useForm();
     const gameEnded = useMatchStore((state) => state.gameEnded)
     const endGame = useMatchStore((state) => state.endGame)
     const quarter = useMatchStore((state) => state.quarter)
     const setQuarter = useMatchStore((state) => state.setQuarter)
-    const teamAlastCell = useMatchStore((state) => state.numberCellNameA)
-    const teamAscore = useMatchStore((state) => state.teamAcurrentScore)
-    const teamBlastCell = useMatchStore((state) => state.numberCellNameB)
-    const teamBscore = useMatchStore((state) => state.teamBcurrentScore)
+   
     const prevGameEnded = useRef(gameEnded)
     const [ready, setReady] = useState(false)
     const [modalTitle, setModalTitle] = useState("")
@@ -55,12 +56,49 @@ export default function FormPlanilla({initialMode="new"}) {
     const endByForfeit = useMatchStore((state) => state.endByForfeit)
     const [forfeitMenuOpen, setForfeitMenuOpen] = useState(false)
     const forfeitMenuRef = useRef(null)
+    const searchParams = useSearchParams();
+    const fileParam = searchParams.get("file");
+    const isViewMode = initialMode === "view" || Boolean(fileParam);
+
+    const router = useRouter()
+    const suspended = useMatchStore((s) => s.suspended)
+    const suspendMatch = useMatchStore((s) => s.suspendMatch)
+    const [suspensionFlow, setSuspensionFlow] = useState(false)
+    const suspendedFileRef = useRef(null)
+    const methods = useForm({
+      disabled: isViewMode 
+    });
     const autosave = useAutosave(methods, ready)
+    const { torneos, loaded: torneosLoaded, registrarResultado } = useTorneos()
+    const [elegirTorneo, setElegirTorneo] = useState(false)
+    
+    const arbitratorNotes = useMatchStore((state) => state.arbitratorNotes);
+    const addArbitratorNote = useMatchStore((state) => state.addArbitratorNote);
+    const updateArbitratorNote = useMatchStore(
+      (state) => state.updateArbitratorNote,
+    );
+    const deleteArbitratorNote = useMatchStore(
+      (state) => state.deleteArbitratorNote,
+    );
+    const [arbitratorModalOpen, setArbitratorModalOpen] = useState(false);
+    const [noteTab, setNoteTab] = useState("nueva"); // "nueva" o "existentes"
+    const [noteText, setNoteText] = useState("");
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [downloadReportsMenuOpen, setDownloadReportsMenuOpen] = useState(false);
+    const [additionalOptionsMenuOpen, setAdditionalOptionsMenuOpen] = useState(false);
+
+    const downloadReportsMenuRef = useRef(null);
+    const additionalOptionsMenuRef = useRef(null);
+    
+    const showModal = (title, message, footer = <></>) => {
+      setModalTitle(title);
+      setModalMessage(message);
+      setModalFooter(footer);
+      setOpen(true);
+    };
+    console.log(torneos)
 
 
-
-
-    useMatchStore.getState
     const generateAndDeliver = async () => {
         if (generating) return
         setGenerating(true)
@@ -92,13 +130,69 @@ export default function FormPlanilla({initialMode="new"}) {
     const handleDownloadPending = () => {
       if (pendingFile) downloadFile(pendingFile)
     }
-    useEffect(() => {
-        const justEnded = !prevGameEnded.current && gameEnded
-        prevGameEnded.current = gameEnded
-    }, [gameEnded])
 
+    useEffect(() => {
+      const el = document.getElementById("planilla-form");
+      if (!el) return;
+      if (suspended) el.setAttribute("inert", "");
+      else el.removeAttribute("inert");
+    }, [suspended, ready]);
+    useEffect(() => {
+      const justEnded = !prevGameEnded.current && gameEnded;
+      prevGameEnded.current = gameEnded;
+      if (!justEnded) return;
+
+      const ref = methods.getValues("torneoRef");
+      if (!ref) return;
+      const { teamAcurrentScore, teamBcurrentScore } = useMatchStore.getState();
+      const forfeit = methods.getValues("forfeit") ?? null
+      
+      registrarResultado(ref.torneo, ref.partidoId, teamAcurrentScore, teamBcurrentScore, forfeit).then((res) => {
+        if (res.ok)
+          showModal(
+            "Resultado registrado",
+            "El resultado del partido se guardó en el torneo.",
+          );
+        else
+          showModal(
+            "Torneo",
+            `No se pudo registrar el resultado en el torneo: ${res.error}`,
+          );
+      });
+      
+    }, [gameEnded]);
+
+    const buildFilename = (sufijo = null) => {
+      const teamAname = methods.getValues("teamA.name") || "Equipo A";
+      const teamBname = methods.getValues("teamB.name") || "Equipo B";
+      const torneo = String(methods.getValues("tournament") || "")
+        .replace(/[_\/\\:*?"<>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const date = new Date().toISOString().split("T")[0];
+      return (
+        [
+          "planilla",
+          teamAname,
+          "vs",
+          teamBname,
+          torneo !== "" ? torneo : null,
+          date,
+          sufijo,
+        ]
+          .filter(Boolean)
+          .join("_") + ".txt"
+      );
+    };
+
+    const saveSheetTxt = () => {
+      if (isViewMode) return;
+      const payload = saveSheet(methods.getValues(), useMatchStore.getState());
+      crearArchivoPlanilla(buildFilename(), payload);
+    };
 
     const doSave = (data) => {
+      if (isViewMode) return;
       try {
         console.log(saveSheet(data, useMatchStore.getState()));
         setModalTitle("Planilla guardada");
@@ -134,27 +228,19 @@ export default function FormPlanilla({initialMode="new"}) {
         setModalMessage("¿Está seguro que desea finalizar el partido? Una vez finalizado, no podrá realizar más cambios.")
         setModalFooter((<button
                             type="button"
-                            onClick={() => {endGame(); setOpen(false)}}
+                            onClick={() => {endGame(); setOpen(false);saveSheetTxt();}}
                             className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
                         >
                             Proceder
                         </button>))
         setOpen(true)
-        
+         
     }
 
 
     //TODO fix showmodal on everything
-    const showModal = (title, message, footer = <></>) => {
-      setModalTitle(title);
-      setModalMessage(message);
-      setModalFooter(footer);
-      setOpen(true);
-    };
-    const goHome = () => {
-      setOpen(false);
-      router.push("/");
-    };
+
+
 
 
     const countStarters = (team) => {
@@ -198,6 +284,7 @@ export default function FormPlanilla({initialMode="new"}) {
         <button
           type="button"
           onClick={() => {
+            methods.setValue("forfeit", option);
             endByForfeit(option);
             setOpen(false);
           }}
@@ -245,7 +332,7 @@ export default function FormPlanilla({initialMode="new"}) {
             setModalMessage("¿Está seguro que desea comenzar el partido? Una vez iniciado, no podrá agregar más jugadores.")
             setModalFooter((<button
                                 type="button"
-                                onClick={() => {setQuarter(1); setOpen(false)}}
+                                onClick={() => {setQuarter(1); setOpen(false);}}
                                 className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
                             >
                                 Proceder
@@ -266,32 +353,65 @@ export default function FormPlanilla({initialMode="new"}) {
         
     }
     useEffect(() => {
-      if (initialMode === "last") {
-        const saved = loadSheet();
+      async function cargarPlanillaHistorica() {
+        if (fileParam) {
+          try {
+            useMatchStore.getState().resetMatch();
+            // Leemos el archivo directamente del OPFS de forma nativa e infalible
+            const planillaObj = await leerArchivoComoJSON(fileParam);
 
-        if (saved?.store && saved?.form) {
-          prevGameEnded.current = !!saved.store.gameEnded;
+            if (planillaObj?.store && planillaObj?.form) {
+              methods.reset(planillaObj.form);
+              const esSuspendida =
+                planillaObj.suspended === true ||
+                planillaObj.store.suspended === true;
+              useMatchStore.setState({
+                ...planillaObj.store,
+                ...(esSuspendida ? { suspended: true } : { gameEnded: true }),
+              });
+              if (esSuspendida) suspendedFileRef.current = fileParam;
+            } else {
+              methods.reset(planillaObj);
+              useMatchStore.setState({ gameEnded: true });
+            }
+          } catch (err) {
+            console.error(
+              "No se pudo cargar el archivo histórico del OPFS:",
+              err,
+            );
+            showModal("Error", "No se pudo cargar la planilla seleccionada.");
+          }
+        } else if (initialMode === "last") {
+          const saved = loadSheet();
 
-          methods.reset(saved.form);
-          useMatchStore.getState().resetMatch();
-          useMatchStore.setState(saved.store);
+          if (saved?.store && saved?.form) {
+            prevGameEnded.current = !!saved.store.gameEnded;
+
+            methods.reset(saved.form);
+            useMatchStore.getState().resetMatch();
+            useMatchStore.setState(saved.store);
+          } else {
+            useMatchStore.getState().resetMatch();
+            prevGameEnded.current = false;
+            setElegirTorneo(true);
+            setModalTitle("Sin planilla guardada");
+            setModalMessage(
+              "No se encontró una planilla guardada. Se abrió una planilla nueva.",
+            );
+            setModalFooter(<></>);
+            setOpen(true);
+          }
         } else {
           useMatchStore.getState().resetMatch();
           prevGameEnded.current = false;
-          setModalTitle("Sin planilla guardada");
-          setModalMessage(
-            "No se encontró una planilla guardada. Se abrió una planilla nueva.",
-          );
-          setModalFooter(<></>);
-          setOpen(true);
+          if (!fileParam && initialMode === "new") setElegirTorneo(true);
         }
-      } else {
-        useMatchStore.getState().resetMatch();
-        prevGameEnded.current = false;
+        setReady(true);
       }
 
-      setReady(true);
+      cargarPlanillaHistorica();
     }, []);
+
     const handleFinalReport = async () => {
       if (!gameEnded || generatingReport || generating) return;
       setGeneratingReport(true);
@@ -318,13 +438,124 @@ export default function FormPlanilla({initialMode="new"}) {
         e.preventDefault();
         e.returnValue = "";
       };
+      if (gameEnded || useMatchStore.getState().suspended) return;
       window.addEventListener("beforeunload", warn);
       return () => window.removeEventListener("beforeunload", warn);
     }, [ready]);
 
- 
+    const handleIniciarPlanilla = (seleccion) => {
+      if (seleccion) aplicarTorneoAPlanilla(methods.setValue, seleccion)
+      setElegirTorneo(false)
+    }
+    const handleSuspend = () => {
+      if (quarter === 0) {
+        showModal("Advertencia", "El partido aún no ha comenzado.");
+        return;
+      }
+      showModal(
+        "Confirmar suspensión",
+        "¿Está seguro que desea suspender el partido? De hacerlo así, no podrá hacer más modificaciones hasta que decida reanudarlo. Si lo hace tiene que generar una nota arbitral.",
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setSuspensionFlow(true);
+              setNoteTab("nueva");
+              setNoteText("");
+              setEditingNoteId(null);
+              setArbitratorModalOpen(true);
+            }}
+            className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+          >
+            Confirmar
+          </button>
+        </>,
+      );
+    };
 
+    // Se llama justo después de guardar la nota arbitral
+    const performSuspension = async () => {
+      try {
+        const hh = new Date().toTimeString().slice(0, 8).replace(/:/g, "");
+        const filename = buildFilename(`suspendido${hh}`);
+        const storeState = { ...useMatchStore.getState(), suspended: true };
+        const base = saveSheet(methods.getValues(), storeState);
+        const payload = typeof base === "string" ? JSON.parse(base) : base;
 
+        await crearArchivoPlanilla(filename, {
+          ...payload,
+          suspended: true,
+          status: "Suspendido",
+        });
+        clearSheet(); // la planilla suspendida vive solo en OPFS
+        suspendedFileRef.current = filename;
+        suspendMatch();
+        showModal(
+          "Partido suspendido",
+          "La planilla quedó guardada como suspendida. Puede reanudarla cuando lo desee.",
+        );
+      } catch (err) {
+        console.error(err);
+        showModal("Error", "No se pudo suspender el partido.");
+      }
+    };
+
+    const handleResume = () => {
+      showModal(
+        "Continuar partido",
+        "¿Está seguro que desea continuar el partido? La planilla podrá modificarse de nuevo.",
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmResume}
+            className="rounded-md px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+          >
+            Continuar
+          </button>
+        </>,
+      );
+    };
+
+    const confirmResume = async () => {
+      setOpen(false);
+      try {
+        const fileName = suspendedFileRef.current;
+        if (!fileName)
+          throw new Error("Archivo de planilla suspendida no encontrado");
+
+        const obj = await leerArchivoComoJSON(fileName);
+        // 1) pasa a localStorage como "última planilla"
+        saveSheet(obj.form, { ...obj.store, suspended: false });
+        // 2) se borra de OPFS
+        await eliminarArchivoPlanilla(fileName);
+        suspendedFileRef.current = null;
+
+        if (isViewMode) {
+          // abierta desde el historial: recarga en modo "última planilla"
+          window.location.assign("/continue_planilla");
+        } else {
+          useMatchStore.getState().resumeMatch();
+        }
+      } catch (err) {
+        console.error(err);
+        showModal("Error", "No se pudo reanudar el partido.");
+      }
+    };
 
 
 
@@ -339,7 +570,7 @@ export default function FormPlanilla({initialMode="new"}) {
               className="mx-auto flex items-center justify-between gap-4"
               style={{ width: SHEET_WIDTH }}
             >
-              <div className="  flex items-center gap-3 z-20">
+              <div className="flex items-center gap-3 z-20">
                 <Link
                   href="/"
                   className="flex w-fit items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 sm:text-base"
@@ -350,113 +581,218 @@ export default function FormPlanilla({initialMode="new"}) {
 
                 <span className="h-5 w-px bg-gray-300 dark:bg-gray-700" />
 
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  disabled={generating}
-                  className="cursor-pointer rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {generating ? "Generando..." : "Imprimir planilla"}
-                </button>
+                {/* 1. Botón Terminar partido (Fuera) */}
                 <button
                   type="button"
                   onClick={handleEndGame}
                   disabled={gameEnded}
-                  className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-600"
+                  className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
                 >
                   {gameEnded ? "Partido terminado" : "Terminar partido"}
                 </button>
-                <button
-                  type="submit"
-                  form="planilla-form"
-                  className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Guardar Planilla
-                </button>
-                <div ref={forfeitMenuRef} className="relative">
+
+                {/* 2. Botón Guardar Planilla (Fuera) */}
+                {!isViewMode && (
                   <button
                     type="button"
-                    onClick={() => setForfeitMenuOpen((v) => !v)}
-                    disabled={gameEnded}
-                    aria-haspopup="menu"
-                    aria-expanded={forfeitMenuOpen}
-                    className="flex cursor-pointer items-center gap-1 rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    form="planilla-form"
+                    className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                   >
-                    Terminar por inasistencia
+                    Guardar Planilla
+                  </button>
+                )}
+
+                {/* 3. Dropdown Registrar forfeit (Fuera, como estaba) */}
+                {!isViewMode && (
+                  <div ref={forfeitMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setForfeitMenuOpen((v) => !v)}
+                      disabled={gameEnded}
+                      aria-haspopup="menu"
+                      aria-expanded={forfeitMenuOpen}
+                      className="flex cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Registrar forfeit
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform ${forfeitMenuOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {forfeitMenuOpen && (
+                      <div
+                        role="menu"
+                        className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                      >
+                        {FORFEIT_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              handleForfeit(opt.id);
+                            }}
+                            className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Nuevo Dropdown: Descargar Reportes (Imprimir planilla + Reporte final) */}
+                <div ref={downloadReportsMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setDownloadReportsMenuOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={downloadReportsMenuOpen}
+                    className="flex cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Descargar Reportes
                     <ChevronDown
                       size={16}
-                      className={`transition-transform ${forfeitMenuOpen ? "rotate-180" : ""}`}
+                      className={`transition-transform ${downloadReportsMenuOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
-                  {forfeitMenuOpen && (
+                  {downloadReportsMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                      className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
                     >
-                      {FORFEIT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => handleForfeit(opt.id)}
-                          className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          handlePrint();
+                          setDownloadReportsMenuOpen(false);
+                        }}
+                        disabled={generating}
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {generating ? "Generando..." : "Imprimir planilla"}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          handleFinalReport();
+                          setDownloadReportsMenuOpen(false);
+                        }}
+                        disabled={!gameEnded || generatingReport || generating}
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {generatingReport
+                          ? "Generando reporte..."
+                          : "Reporte final"}
+                      </button>
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleFinalReport}
-                  disabled={!gameEnded || generatingReport || generating}
-                  className="cursor-pointer rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {generatingReport
-                    ? "Generando reporte..."
-                    : "Generar reporte final"}
-                </button>
-              </div>
 
-              <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
-                <span>
-                  <b>A:</b> {teamAscore}{" "}
-                  <span className="opacity-60">({teamAlastCell || "—"})</span>
-                </span>
-                <span>
-                  <b>B:</b> {teamBscore}{" "}
-                  <span className="opacity-60">({teamBlastCell || "—"})</span>
-                </span>
-              </div>
+                {/* 5. Nuevo Dropdown: Opciones adicionales (Notas Arbitrales + Suspender/Continuar) */}
+                <div ref={additionalOptionsMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAdditionalOptionsMenuOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={additionalOptionsMenuOpen}
+                    className="flex cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Opciones adicionales
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${additionalOptionsMenuOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
 
-              <div className="flex rounded-lg bg-gray-300 p-1 dark:bg-gray-700">
-                {QUARTERS.map((q) => {
-                  const isLocked = q.id < quarter || gameEnded;
-                  const isActive = quarter === q.id;
-
-                  return (
-                    <button
-                      key={q.id}
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => handleQuarterChange(q.id)}
-                      className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
-                      } ${
-                        isLocked && !isActive
-                          ? "cursor-not-allowed opacity-40 hover:text-gray-600"
-                          : ""
-                      }`}
+                  {additionalOptionsMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
                     >
-                      {q.label}
-                    </button>
-                  );
-                })}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setNoteTab("nueva");
+                          setNoteText("");
+                          setEditingNoteId(null);
+                          setArbitratorModalOpen(true);
+                          setAdditionalOptionsMenuOpen(false);
+                        }}
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Notas Arbitrales
+                      </button>
+
+                      {suspended ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            handleResume();
+                            setAdditionalOptionsMenuOpen(false);
+                          }}
+                          className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                        >
+                          Continuar partido
+                        </button>
+                      ) : (
+                        !isViewMode && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              handleSuspend();
+                              setAdditionalOptionsMenuOpen(false);
+                            }}
+                            disabled={gameEnded}
+                            className="block w-full px-4 py-2 text-left text-sm text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Suspender partido
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Resto de elementos de la interfaz (cuartos, modales, etc.) */}
+              {!isViewMode && (
+                <div className="flex rounded-lg bg-gray-300 p-1 dark:bg-gray-700">
+                  {QUARTERS.map((q) => {
+                    const isLocked = q.id < quarter || gameEnded;
+                    const isActive = quarter === q.id;
+
+                    return (
+                      <button
+                        key={q.id}
+                        type="button"
+                        disabled={isLocked}
+                        onClick={() => handleQuarterChange(q.id)}
+                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
+                          isActive
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
+                        } ${
+                          isLocked && !isActive
+                            ? "cursor-not-allowed opacity-40 hover:text-gray-600"
+                            : ""
+                        }`}
+                      >
+                        {q.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {open && (
                 <Modal
                   open
@@ -468,6 +804,180 @@ export default function FormPlanilla({initialMode="new"}) {
                   <p>{modalMessage}</p>
                 </Modal>
               )}
+
+              {arbitratorModalOpen && (
+                <Modal
+                  open
+                  onClose={() => {
+                    setArbitratorModalOpen(false);
+                    setSuspensionFlow(false);
+                  }}
+                  title={
+                    suspensionFlow
+                      ? "Nota arbitral (requerida para suspender)"
+                      : "Nota arbitral"
+                  }
+                  size="md"
+                  footer={
+                    <div className="flex justify-end gap-2 w-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setArbitratorModalOpen(false);
+                          setSuspensionFlow(false);
+                          setNoteText("");
+                          setEditingNoteId(null);
+                        }}
+                        className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!noteText.trim()) return;
+                          if (suspensionFlow) {
+                            addArbitratorNote(noteText.trim());
+                            setArbitratorModalOpen(false);
+                            setSuspensionFlow(false);
+                            setNoteText("");
+                            await performSuspension();
+                            return;
+                          }
+                          if (editingNoteId)
+                            updateArbitratorNote(
+                              editingNoteId,
+                              noteText.trim(),
+                            );
+                          else addArbitratorNote(noteText.trim());
+                          setNoteText("");
+                          setEditingNoteId(null);
+                          setNoteTab("existentes");
+                        }}
+                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        Guardar
+                      </button>
+                    </div>
+                  }
+                >
+                  <div className="flex flex-col gap-4">
+                    {!suspensionFlow && (
+                      <div className="flex rounded-lg bg-gray-200 p-1 dark:bg-gray-800 w-fit">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteTab("nueva");
+                            if (!editingNoteId) setNoteText("");
+                          }}
+                          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                            noteTab === "nueva"
+                              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white"
+                              : "text-gray-600 dark:text-gray-400"
+                          }`}
+                        >
+                          Nueva
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteTab("existentes");
+                            setEditingNoteId(null);
+                            setNoteText("");
+                          }}
+                          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                            noteTab === "existentes"
+                              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white"
+                              : "text-gray-600 dark:text-gray-400"
+                          }`}
+                        >
+                          Existentes ({arbitratorNotes.length})
+                        </button>
+                      </div>
+                    )}
+
+                    {noteTab === "nueva" ? (
+                      <textarea
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Ingrese la nota..."
+                        rows={4}
+                        className="w-full rounded-md border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                      />
+                    ) : (
+                      <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+                        {arbitratorNotes.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-6">
+                            No hay notas registradas.
+                          </p>
+                        ) : (
+                          arbitratorNotes.map((note) => (
+                            <div
+                              key={note.id}
+                              className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
+                            >
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate max-w-[280px]">
+                                {note.text.length > 15
+                                  ? `${note.text.substring(0, 15)}...`
+                                  : note.text}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  title="Editar"
+                                  onClick={() => {
+                                    setEditingNoteId(note.id);
+                                    setNoteText(note.text);
+                                    setNoteTab("nueva");
+                                  }}
+                                  className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                    />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Eliminar"
+                                  onClick={() => deleteArbitratorNote(note.id)}
+                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Modal>
+              )}
+
               {pendingFile && (
                 <Modal
                   open
@@ -499,6 +1009,14 @@ export default function FormPlanilla({initialMode="new"}) {
                     el dispositivo.
                   </p>
                 </Modal>
+              )}
+
+              {elegirTorneo && (
+                <IniciarPlanillaModal
+                  torneos={torneos}
+                  loaded={torneosLoaded}
+                  onConfirm={handleIniciarPlanilla}
+                />
               )}
             </div>
           </div>

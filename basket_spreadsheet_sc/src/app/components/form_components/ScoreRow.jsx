@@ -9,18 +9,21 @@ export const colorForPeriod = (period) =>
   period == 1 || period == 3 ? "text-red-600" : "text-black";
 
 
+
 // Mismo criterio que colorForPeriod, pero en hex para usarlo en border-color
 const hexForPeriod = (period) =>
   period == 1 || period == 3 ? "#dc2626" : "#000000";
 
 
-function ScoreRow({ team, value, name, players }) {
+function ScoreRow({ team, value, name, players, handleModify }) {
   const { setValue, getValues } = useFormContext();
 
   // Selectores primitivos: solo re-renderiza la fila cuyo valor cambia
   const endMark = useMatchStore((s) => s.endMarks[team][value]); // cuarto que cerró esta fila, o undefined
   const isFinal = useMatchStore((s) => s.finalRow[team] === value);
   const isOvertimeMark = useMatchStore((s) => s.overtimeMarks[team][value] === true);
+  const onModify = useCallback(() => handleModify?.(team, value), [handleModify, team, value])
+
   const handleNumberChange = useCallback((dorsalName, dorsalValue, previousDorsal) => {
     const state = useMatchStore.getState();
     const isA = team === "A";
@@ -91,6 +94,8 @@ function ScoreRow({ team, value, name, players }) {
     endMark={endMark}
     overtimeMark={isOvertimeMark}
     isFinal={isFinal}
+    handleModify={handleModify}
+    onModify={onModify}
   />
 );
 

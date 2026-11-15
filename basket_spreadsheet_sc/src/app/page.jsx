@@ -69,12 +69,12 @@ export default function App() {
               path="/continue_planilla"
             />
 
-            {/*<OptionButton
+            {<OptionButton
               title="Consultar planillas"
               description="Buscar y revisar registros anteriores"
               icon={Search}
               path="/search_planillas"
-            />*/}
+            />}
 
             {/*<OptionButton
               title="Tutorial"
@@ -82,12 +82,12 @@ export default function App() {
               icon={CircleQuestionMark}
               path="/search_planillas"
             />*/}
-            {/*<OptionButton
+            {<OptionButton
               title="Configuración"
-              description="Personaliza tu experiencia y ajusta preferencias"
+              description="Exporta e importa datos"
               icon={Settings}
-              path="/search_planillas"
-            />*/}
+              path="/settings"
+            />}
             <OptionButton
               title="Torneos"
               description="Gestionar torneos y competencias"

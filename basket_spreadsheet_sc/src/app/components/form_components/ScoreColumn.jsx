@@ -5,7 +5,7 @@ import { NUMBER_CELL_WIDTH, ROW_HEIGHT } from "./ScoreNumberCell";
 import { SELECT_CELL_WIDTH } from "./DorsalSelect";
 import { useMatchStore } from "../../utils/store/matchStore";
 
-export default function ScoreColumn({ team, range, name = "runningScore", players = [] }) {
+export default function ScoreColumn({ team, range, name = "runningScore", players = [], handleModify }) {
     const [from, to] = range;
     const values = Array.from({ length: to - from + 1 }, (_, i) => from + i);
     const columnWidth = NUMBER_CELL_WIDTH + SELECT_CELL_WIDTH;
@@ -22,6 +22,7 @@ export default function ScoreColumn({ team, range, name = "runningScore", player
             setDiag(null);
             return;
         }
+
         const wrapperRect = wrapperRef.current.getBoundingClientRect();
         const rows = bodyRef.current.children;
         const finalRect = rows[finalRow - from].getBoundingClientRect();
@@ -54,6 +55,7 @@ export default function ScoreColumn({ team, range, name = "runningScore", player
                             value={value}
                             players={players}
                             name={`${name}.${team}.${value}`}
+                            handleModify={handleModify}
                         />
                     ))}
                 </tbody>

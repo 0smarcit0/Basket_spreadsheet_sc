@@ -1,11 +1,13 @@
 import ScoreColumn from "../form_components/ScoreColumn"
+import ModifyScoreModal from "../form_components/ModifyScoreModal"
 import { useFormContext } from "react-hook-form"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMatchStore } from "../../utils/store/matchStore"; 
+
 export function useTeamPlayers(team) {
   const { watch, getValues } = useFormContext();
   const quarter = useMatchStore((state) => state.quarter); 
-
+  const gameEnded = useMatchStore((state) => state.gameEnded);
   const getProcessedPlayers = () => {
     const currentPlayers = getValues(`team${team}.players`) ?? [];
     return currentPlayers
@@ -13,12 +15,26 @@ export function useTeamPlayers(team) {
       .map((p) => ({ number: p.number, name: p.name }));
   };
 
-  const [players, setPlayers] = useState(getProcessedPlayers);
-
+  const [players, setPlayers] = useState(() => {
+    // Si el partido no ha comenzado (quarter === 0) Y el partido no ha finalizado 
+    // (lo que indicaría que es una planilla nueva vacía), devolvemos un arreglo vacío
+    // para evitar precargar basura o disparar estados prematuros.
+    if (quarter === 0 && !gameEnded) {
+      const initialCheck = getProcessedPlayers();
+      // Si por un reseteo de formulario ya trajera datos cargados (como al cargar "last"),
+      // permitimos leerlos solo si el formulario ya tiene datos explícitos.
+      if (initialCheck.length === 0) return [];
+    }
+    return getProcessedPlayers();
+  });
   useEffect(() => {
     // Si el partido no ha comenzado (quarter === 0), detenemos la ejecución.
     // Esto evita re-renders y actualizaciones mientras se llena la plantilla inicial.
-    if (quarter === 0) return;
+    if (quarter === 0 && !gameEnded) {
+      setPlayers([]);
+      return;
+    }
+   
 
     // Cuando el quarter cambia de 0 a un número mayor, forzamos una actualización 
     // inmediata para reflejar los jugadores que se llenaron durante el quarter 0.
@@ -46,9 +62,20 @@ export function useTeamPlayers(team) {
   return players;
 }
 
+const COLUMN_RANGES = [[1, 40], [41, 80], [81, 120], [121, 160]]
+
 export default function RunningScoreForm() {
-    const playersA = useTeamPlayers("A")
-    const playersB = useTeamPlayers("B")
+
+
+    // Canasta que se está modificando: { team, row } o null
+    const [target, setTarget] = useState(null)
+
+    // Estable (useCallback) para no romper el memo de ScoreRow
+    const handleModify = useCallback((team, row) => {
+        if (useMatchStore.getState().gameEnded) return
+        setTarget({ team, row })
+    }, [])
+    const closeModify = useCallback(() => setTarget(null), [])
    
     return(
      <div >
@@ -56,23 +83,14 @@ export default function RunningScoreForm() {
             <p className="text-center font-bold border-r border-l" style={{fontSize:20}}>Running Score</p>
         </div>
         <div className="flex flex-row border border-b-2">
-            <div className="flex flex-row " >
-                <ScoreColumn team="A" range={[1,40]} players={playersA} />
-                <ScoreColumn team="B" range={[1,40]} players={playersB}/>
-            </div>
-            
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[41,80]} players={playersA}/>
-                <ScoreColumn team="B" range={[41,80]} players={playersB}/>
-            </div>
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[81,120]} players={playersA}/>
-                <ScoreColumn team="B" range={[81,120]} players={playersB}/>
-            </div>
-            <div className="flex flex-row">
-                <ScoreColumn team="A" range={[121,160]} players={playersA}/>
-                <ScoreColumn team="B" range={[121,160]} players={playersB}/>
-            </div>
+            {COLUMN_RANGES.map((range) => (
+                <div key={range[0]} className="flex flex-row">
+                    <ScoreColumn team="A" range={range} players={useTeamPlayers("A")} handleModify={handleModify} />
+                    <ScoreColumn team="B" range={range} players={useTeamPlayers("B")} handleModify={handleModify} />
+                </div>
+            ))}
         </div>
+
+        <ModifyScoreModal target={target} onClose={closeModify} />
     </div>)
 }
