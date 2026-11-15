@@ -14,8 +14,36 @@ export const FORMATOS_PARTIDOS = [
   { id: "mejor3", label: "Mejor de 3" },
 ]
 
+// Partidos que deben jugar dos equipos en cada llave de la eliminatoria (Standard)
+export const FORMATOS_ELIMINATORIA = [
+  { id: "1", label: "1 partido" },
+  { id: "ida_vuelta", label: "Ida y vuelta (global de puntos)" },
+  { id: "mejor3", label: "Mejor de 3" },
+]
+export const etiquetaFormatoEliminatoria = (id) => FORMATOS_ELIMINATORIA.find((f) => f.id === id)?.label ?? id
+
 export const etiquetaTipo = (id) => TIPOS.find((t) => t.id === id)?.label ?? id
 export const etiquetaFormato = (id) => FORMATOS_PARTIDOS.find((f) => f.id === id)?.label ?? id
+
+export const nuevoId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+export const MAX_LLAVE = 32 // la eliminatoria llega hasta dieciseisavos
+
+export function potenciaDe2(n) {
+  let p = 1
+  while (p < n) p *= 2
+  return p
+}
+
+// Tamaño de cada grupo: floor(total / porGrupo) grupos; los equipos que sobran se reparten
+// de a uno por grupo (nunca varios en el mismo grupo mientras otros no tengan uno).
+export function tamanosGrupos(total, porGrupo) {
+  const g = Math.floor(total / porGrupo)
+  const tamanos = Array(g).fill(porGrupo)
+  for (let i = 0; i < total - g * porGrupo; i++) tamanos[i % g]++
+  return tamanos
+}
 
 // Devuelve un mensaje de error o null.
 export function validarConfig(c, totalEquipos) {
@@ -24,21 +52,48 @@ export function validarConfig(c, totalEquipos) {
     return "Selecciona la cantidad de partidos entre equipos."
   }
   if (c.tipo === TIPO_STANDARD) {
-    const g = Number(c.equiposPorGrupo)
+    const p = Number(c.equiposPorGrupo)
     const q = Number(c.clasificadosPorGrupo)
-    if (!Number.isInteger(g) || g < 2 || g > totalEquipos) {
+    if (!Number.isInteger(p) || p < 2 || p > totalEquipos) {
       return `Los equipos por grupo deben ser un entero entre 2 y ${totalEquipos}.`
     }
-    if (!Number.isInteger(q) || q < 1 || q >= g) {
-      return `Los clasificados por grupo deben ser un entero entre 1 y ${g - 1}.`
+    if (!Number.isInteger(q) || q < 1 || q >= p) {
+      return `Los clasificados por grupo deben ser un entero entre 1 y ${p - 1}.`
+    }
+    if (c.partidosEliminatoria != null && !FORMATOS_ELIMINATORIA.some((f) => f.id === c.partidosEliminatoria)) {
+      return "Selecciona la cantidad de partidos por llave en la eliminatoria."
+    }
+    const g = Math.floor(totalEquipos / p)
+    const clasificados = g * q
+    if (clasificados < 2) {
+      return `Con ${g} ${g === 1 ? "grupo" : "grupos"} y ${q} clasificado(s) por grupo solo avanzaría ${clasificados} equipo; la eliminatoria necesita al menos 2.`
+    }
+    const llave = potenciaDe2(clasificados)
+    if (llave > MAX_LLAVE) {
+      return `La eliminatoria admite máximo ${MAX_LLAVE} equipos (dieciseisavos) y esta configuración clasifica ${clasificados}.`
+    }
+    if (llave - clasificados > g) {
+      return `Clasifican ${clasificados} equipos y la llave necesita ${llave}. Los ${llave - clasificados} lugares restantes se completan con los mejores ${q + 1}.º puestos de los grupos, pero solo hay ${g} ${g === 1 ? "grupo" : "grupos"}. Ajusta los equipos por grupo o los clasificados.`
     }
   }
   return null
 }
 
 /* ───────────── Consultas sobre un torneo ───────────── */
+// Retiro voluntario: equipos que abandonaron el torneo (sus resultados se anulan, D.5.1)
+export const retiradosSet = (torneo) => new Set((torneo.retirados ?? []).map((r) => r.equipo))
+export const equiposActivos = (torneo) => {
+  const ret = retiradosSet(torneo)
+  return torneo.equipos.map((e) => e.nombreequipo).filter((n) => !ret.has(n))
+}
+
 export const jornadaActiva = (torneo) => torneo.jornadas.find((j) => j.estado === "activa") ?? null
-export const maxPartidosPorJornada = (torneo) => Math.floor(torneo.equipos.length / 2)
+export const maxPartidosPorJornada = (torneo) => {
+  const ret = retiradosSet(torneo)
+  return torneo.config?.tipo === TIPO_STANDARD && torneo.grupos?.length
+    ? torneo.grupos.reduce((suma, g) => suma + Math.floor(g.equipos.filter((n) => !ret.has(n)).length / 2), 0)
+    : Math.floor(equiposActivos(torneo).length / 2)
+}
 
 // Equipo ganador del partido; null si no hay (p. ej. inasistencia de ambos equipos).
 export function ganador(p) {
@@ -59,6 +114,7 @@ function historial(jornadas) {
   const m = new Map()
   for (const j of jornadas) {
     for (const p of j.partidos) {
+      if ((p.fase ?? "grupos") !== "grupos") continue // las eliminatorias no cuentan para los emparejamientos de grupo
       const k = claveParFn(p.equipoA, p.equipoB)
       const h = m.get(k) ?? { total: 0, pendientes: 0, victorias: {}, ultimo: null }
       h.total++
@@ -66,7 +122,7 @@ function historial(jornadas) {
       if (p.estado === "jugado") {
         const g = ganador(p)
         if (g) h.victorias[g] = (h.victorias[g] ?? 0) + 1
-      } else {
+      } else if (p.estado === "programado") {
         h.pendientes++
       }
       m.set(k, h)
@@ -102,8 +158,7 @@ export function paresDisponibles(nombres, jornadas, modo) {
 export function torneoTerminado(torneo) {
   if (torneo.config?.tipo !== TIPO_LEADERBOARD) return false
   if (torneo.jornadas.length === 0 || jornadaActiva(torneo)) return false
-  const nombres = torneo.equipos.map((e) => e.nombreequipo)
-  return paresDisponibles(nombres, torneo.jornadas, torneo.config.partidosEntreEquipos).length === 0
+  return paresDisponibles(equiposActivos(torneo), torneo.jornadas, torneo.config.partidosEntreEquipos).length === 0
 }
 
 /* ───────────── Emparejamientos aleatorios ───────────── */
@@ -117,9 +172,8 @@ export function barajar(lista) {
 }
 
 // Elige hasta `cantidad` partidos sin repetir equipo (un equipo juega una sola vez por jornada)
-// entre las parejas disponibles. Devuelve [[equipoA, equipoB], ...]; puede devolver menos de `cantidad`.
-export function emparejar(nombres, jornadas, modo, cantidad) {
-  const pares = paresDisponibles(nombres, jornadas, modo)
+// entre las parejas candidatas `pares`. Devuelve [[equipoA, equipoB], ...]; puede devolver menos.
+export function emparejarPares(pares, jornadas, cantidad) {
   const h = historial(jornadas)
 
   let mejor = []
@@ -144,6 +198,11 @@ export function emparejar(nombres, jornadas, modo, cantidad) {
   })
 }
 
+// Leaderboard: todas las parejas del torneo
+export function emparejar(nombres, jornadas, modo, cantidad) {
+  return emparejarPares(paresDisponibles(nombres, jornadas, modo), jornadas, cantidad)
+}
+
 /* ───────────── Clasificación (Reglas Oficiales FIBA 2026, Apéndice D) ─────────────
    D.1.1  Victoria = 2 pts · derrota = 1 pt (incluida la perdida por default) · derrota por inasistencia = 0 pts.
    D.1.3  Si hay equipos con los mismos puntos, se decide solo con los partidos entre ellos:
@@ -159,7 +218,7 @@ const PTS_DERROTA = 1
 const PTS_INASISTENCIA = 0
 
 // Partidos jugados y vigentes (sin los anulados por D.3.2) + conteo de inasistencias por equipo
-function partidosVigentes(torneo) {
+export function partidosVigentes(torneo) {
   const jugados = torneo.jornadas.flatMap((j) => j.partidos).filter((p) => p.estado === "jugado" && p.resultado)
 
   const inasistencias = new Map()
@@ -170,9 +229,11 @@ function partidosVigentes(torneo) {
     if (f === "B" || f === "both") sumar(p.equipoB)
   }
 
+  const retirados = retiradosSet(torneo)
   const anulados = new Set([...inasistencias].filter(([, n]) => n >= 2).map(([e]) => e))
+  retirados.forEach((e) => anulados.add(e)) // D.5.1: retiro voluntario = se anulan todos sus partidos
   const vigentes = jugados.filter((p) => !anulados.has(p.equipoA) && !anulados.has(p.equipoB))
-  return { vigentes, anulados, inasistencias }
+  return { vigentes, anulados, inasistencias, retirados }
 }
 
 // Resultado de un partido desde el punto de vista de un lado ("A" | "B")
@@ -188,7 +249,7 @@ function lineaPartido(p, lado) {
 }
 
 // Estadísticas de `nombres` considerando solo los partidos jugados entre equipos de ese conjunto
-function estadisticas(partidos, nombres) {
+export function estadisticas(partidos, nombres) {
   const m = new Map([...nombres].map((n) => [n, { pj: 0, pg: 0, pp: 0, pf: 0, pc: 0, pts: 0 }]))
   for (const p of partidos) {
     if (!m.has(p.equipoA) || !m.has(p.equipoB)) continue
@@ -207,7 +268,7 @@ function estadisticas(partidos, nombres) {
 }
 
 // Agrupa por valor (mayor primero); los de igual valor quedan juntos
-function agruparDesc(lista, valor) {
+export function agruparDesc(lista, valor) {
   const orden = [...lista].sort((a, b) => valor(b) - valor(a))
   const grupos = []
   for (const t of orden) {
@@ -242,25 +303,17 @@ function desempatar(grupo, ctx) {
   return [grupo]
 }
 
-// Tabla de posiciones del leaderboard (grupo único).
-// Fila: { pos, equipo, pj, pg, pp, pf, pc, dif, pts, empate, porSorteo, anulado, inasistencias }
-//  - empate: torneo finalizado y el empate sigue sin resolverse -> requiere sorteo (comparten posición)
-//  - porSorteo: el empate se resolvió con el sorteo guardado en torneo.sorteo
-//  - anulado: 2 inasistencias, sus partidos no cuentan y queda al final de la tabla
-export function calcularTabla(torneo) {
-  const nombres = torneo.equipos.map((e) => e.nombreequipo)
-  const { vigentes, anulados, inasistencias } = partidosVigentes(torneo)
-  const todos = estadisticas(vigentes, new Set(nombres))
-  const final = torneoTerminado(torneo)
-  const ordenSorteo = new Map((torneo.sorteo ?? []).map((n, i) => [n, i]))
+const alfa = (a, b) => a.localeCompare(b, "es")
 
-  const activos = nombres.filter((n) => !anulados.has(n))
-  const bloques = agruparDesc(activos, (n) => todos.get(n).pts).flatMap((g) => desempatar(g, { vigentes, todos }))
-
+// Aplana bloques de equipos (cada bloque = empatados que ningún criterio separó) en filas con posición.
+// Dentro de un bloque: orden del sorteo si existe; si no, alfabético y, con `marcarEmpates`, marcados como empate
+// (los empatados comparten posición).
+export function aplanarBloques(bloques, sorteo, marcarEmpates, inicio = 0) {
+  const ordenSorteo = new Map((sorteo ?? []).map((n, i) => [n, i]))
   const filas = []
-  let usados = 0
+  let usados = inicio
   for (const bloque of bloques) {
-    const miembros = [...bloque].sort((a, b) => a.localeCompare(b, "es"))
+    const miembros = [...bloque].sort(alfa)
     let empate = false
     let porSorteo = false
     if (miembros.length > 1) {
@@ -268,16 +321,31 @@ export function calcularTabla(torneo) {
         miembros.sort((a, b) => ordenSorteo.get(a) - ordenSorteo.get(b))
         porSorteo = true
       } else {
-        empate = final
+        empate = marcarEmpates
       }
     }
     miembros.forEach((n, i) => {
-      filas.push({ equipo: n, pos: empate ? usados + 1 : usados + i + 1, empate, porSorteo, anulado: false })
+      filas.push({ equipo: n, pos: empate ? usados + 1 : usados + i + 1, empate, porSorteo })
     })
     usados += miembros.length
   }
-  for (const n of [...anulados].sort((a, b) => a.localeCompare(b, "es"))) {
-    filas.push({ equipo: n, pos: ++usados, empate: false, porSorteo: false, anulado: true })
+  return filas
+}
+
+// Tabla de un grupo. `partidos` = partidos vigentes ya filtrados a los de ese grupo/fase.
+// Fila: { pos, equipo, pj, pg, pp, pf, pc, dif, pts, empate, porSorteo, anulado, inasistencias }
+//  - empate: la fase terminó y el empate sigue sin resolverse -> requiere sorteo (comparten posición)
+//  - porSorteo: el empate se resolvió con el sorteo guardado en torneo.sorteo
+//  - anulado: 2 inasistencias, sus partidos no cuentan y queda al final de la tabla
+export function construirTabla({ nombres, partidos, anulados, inasistencias, sorteo, marcarEmpates, retirados = new Set() }) {
+  const todos = estadisticas(partidos, new Set(nombres))
+  const activos = nombres.filter((n) => !anulados.has(n))
+  const bloques = agruparDesc(activos, (n) => todos.get(n).pts).flatMap((g) => desempatar(g, { vigentes: partidos, todos }))
+
+  const filas = aplanarBloques(bloques, sorteo, marcarEmpates).map((f) => ({ ...f, anulado: false, retirado: false }))
+  let usados = filas.length
+  for (const n of nombres.filter((x) => anulados.has(x)).sort(alfa)) {
+    filas.push({ equipo: n, pos: ++usados, empate: false, porSorteo: false, anulado: true, retirado: retirados.has(n) })
   }
 
   return filas.map((f) => {
@@ -286,11 +354,24 @@ export function calcularTabla(torneo) {
   })
 }
 
+// Tabla del leaderboard (grupo único)
+export function calcularTabla(torneo) {
+  const { vigentes, anulados, inasistencias, retirados } = partidosVigentes(torneo)
+  return construirTabla({
+    nombres: torneo.equipos.map((e) => e.nombreequipo),
+    partidos: vigentes,
+    anulados,
+    retirados,
+    inasistencias,
+    sorteo: torneo.sorteo,
+    marcarEmpates: torneoTerminado(torneo),
+  })
+}
+
 /* ───────────── D.6: serie de 2 partidos (ida y vuelta) por puntos acumulados ─────────────
-   Aún no se usa en el leaderboard (allí cada partido se clasifica por separado, D.1.2);
-   queda lista para las eliminatorias del formato Standard.
-   p1 y p2: { equipoA, equipoB, puntosA, puntosB } (cada partido con sus propios locales; p2 = resultado final,
-   ya con los tiempos extra del segundo partido si hicieron falta). */
+   Se usa en la eliminatoria del formato Standard cuando se elige «Ida y vuelta».
+   p1 y p2: { equipoA, equipoB, puntosA, puntosB, ganador? } (cada partido con sus propios locales; p2 = resultado
+   final, ya con los tiempos extra del segundo partido si hicieron falta). */
 export function ganadorSerieIdaVuelta(p1, p2) {
   const [x, y] = [p1.equipoA, p1.equipoB]
   const total = { [x]: 0, [y]: 0 }
@@ -298,8 +379,9 @@ export function ganadorSerieIdaVuelta(p1, p2) {
   for (const p of [p1, p2]) {
     total[p.equipoA] += p.puntosA
     total[p.equipoB] += p.puntosB
-    if (p.puntosA > p.puntosB) victorias[p.equipoA]++
-    else if (p.puntosB > p.puntosA) victorias[p.equipoB]++
+    // `ganador` (opcional) manda sobre el marcador: p. ej. inasistencias
+    const g = "ganador" in p ? p.ganador : p.puntosA > p.puntosB ? p.equipoA : p.puntosB > p.puntosA ? p.equipoB : null
+    if (g) victorias[g]++
   }
   if (victorias[x] === 2) return { ganador: x, motivo: "ganó los dos partidos", total }
   if (victorias[y] === 2) return { ganador: y, motivo: "ganó los dos partidos", total }

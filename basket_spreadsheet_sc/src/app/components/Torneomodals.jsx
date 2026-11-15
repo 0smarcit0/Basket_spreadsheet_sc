@@ -4,6 +4,7 @@ import { ChevronRight, Plus, Trash2, X } from "lucide-react"
 import Modal from "./Modal"
 import VistaTorneo from "./TorneoVista"
 import { jornadaActiva } from "../utils/torneoLogic"
+import { etiquetaFase, etiquetaPartido } from "../utils/torneoEstandar"
 import {
   equipoVacio,
   equipoTieneDatos,
@@ -15,6 +16,7 @@ import {
   CARGO_COACH,
   CARGO_ASISTENTE,
 } from "../utils/hooks/useTorneos"
+import Link from "next/link"
 
 // 80vw x 70vh. El "!" hace que gane sobre el max-w-* que Modal aplica por `size`.
 const MODAL_GRANDE = "!max-w-[80vw] h-[70vh]"
@@ -312,8 +314,9 @@ function EquipoModal({ titulo, inicial, textoGuardar, onClose, onSave }) {
 
 // onUpdateEquipo(nombreTorneo, nombreEquipoViejo, equipoNuevo) y
 // onAddEquipo(nombreTorneo, equipoNuevo) -> Promise<{ ok, error? }>
-// onIniciarTorneo(nombreTorneo, config), onGenerarJornada(nombreTorneo, cantidad),
-// onFinalizarJornada(nombreTorneo, jornadaId), onRealizarSorteo(nombreTorneo) -> Promise<{ ok, error? }>
+// onIniciarTorneo(nombreTorneo, config), onGenerarJornada(nombreTorneo, cantidad), onGenerarFase(nombreTorneo),
+// onFinalizarJornada(nombreTorneo, jornadaId), onRealizarSorteo(nombreTorneo),
+// onRetirarEquipo(nombreTorneo, equipo) -> Promise<{ ok, error? }>
 export function DetalleTorneoModal({
   torneo,
   onClose,
@@ -321,8 +324,10 @@ export function DetalleTorneoModal({
   onAddEquipo,
   onIniciarTorneo,
   onGenerarJornada,
+  onGenerarFase,
   onFinalizarJornada,
   onRealizarSorteo,
+  onRetirarEquipo,
 }) {
   const [vista, setVista] = useState("equipos") // "equipos" | "torneo"
   const [equipoSel, setEquipoSel] = useState(null) // nombre del equipo abierto
@@ -358,8 +363,10 @@ export function DetalleTorneoModal({
             torneo={torneo}
             onIniciar={onIniciarTorneo}
             onGenerarJornada={onGenerarJornada}
+            onGenerarFase={onGenerarFase}
             onFinalizarJornada={onFinalizarJornada}
             onRealizarSorteo={onRealizarSorteo}
+            onRetirarEquipo={onRetirarEquipo}
           />
         ) : (
           <>
@@ -431,7 +438,8 @@ export function DetalleTorneoModal({
 }
 
 /* ───────────── Planilla nueva: elegir torneo y partido/equipos ───────────── */
-const SIN_TORNEO = "__sin_torneo__"
+const SIN_TORNEO = "SIN TORNEO"
+const PERSONALIZADO = "__PERSONALIZADO__" // solo es el value del <select>, nunca se escribe en la planilla
 export const MAX_JUGADORES_PLANILLA = MAX_JUGADORES // filas de jugadores por equipo en la planilla
 
 // Modal obligatorio: no se puede cerrar, solo continuar.
@@ -445,14 +453,13 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
   const [nombreA, setNombreA] = useState("")
   const [nombreB, setNombreB] = useState("")
   const [partidoId, setPartidoId] = useState("")
-
   const torneo = torneos.find((t) => t.nombretorneo === opcion)
   const iniciado = !!torneo?.config
-  const leaderboard = torneo?.config?.tipo === "leaderboard"
+  const standard = torneo?.config?.tipo === "standard"
   const jornada = torneo && iniciado ? jornadaActiva(torneo) : null
-  const partido = jornada?.partidos.find((p) => p.id === partidoId && p.estado !== "jugado")
-  const hayProgramados = !!jornada?.partidos.some((p) => p.estado !== "jugado")
-
+  const partido = jornada?.partidos.find((p) => p.id === partidoId && p.estado === "programado")
+  const hayProgramados = !!jornada?.partidos.some((p) => p.estado === "programado")
+  const [textoPersonalizado, setTextoPersonalizado] = useState("")
   const nombreEqA = iniciado ? partido?.equipoA : nombreA
   const nombreEqB = iniciado ? partido?.equipoB : nombreB
   const equipoA = torneo?.equipos.find((e) => e.nombreequipo === nombreEqA)
@@ -462,7 +469,10 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
   const pocosEquipos = !!torneo && !iniciado && torneo.equipos.length < 2
   const excedidos = [equipoA, equipoB].filter((e) => e && e.roster.length > MAX_JUGADORES_PLANILLA)
 
-  const puedeContinuar = opcion === SIN_TORNEO || (!!equipoA && !!equipoB && !mismoEquipo)
+  const puedeContinuar =
+  opcion === SIN_TORNEO ||
+  (opcion === PERSONALIZADO && textoPersonalizado.trim() !== "") ||
+  (!!equipoA && !!equipoB && !mismoEquipo)
 
   const elegirOpcion = (v) => {
     setOpcion(v)
@@ -470,13 +480,28 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
     setNombreB("")
     setPartidoId("")
   }
+ 
 
-  const continuar = () =>
-    onConfirm(
-      opcion === SIN_TORNEO
-        ? null
-        : { torneo, equipoA, equipoB, partido: iniciado ? { id: partido.id, jornadaId: jornada.id } : null }
-    )
+
+ const continuar = () => {
+   // Partido libre: sin torneo vinculado (torneo: null, partido: null),
+   // solo cambia el texto que se muestra en el encabezado.
+   if (opcion === SIN_TORNEO || opcion === PERSONALIZADO) {
+     return onConfirm({
+       torneo: null,
+       etiqueta: opcion === SIN_TORNEO ? SIN_TORNEO : textoPersonalizado.trim(),
+       equipoA: null,
+       equipoB: null,
+       partido: null,
+     });
+   }
+   onConfirm({
+     torneo,
+     equipoA,
+     equipoB,
+     partido: iniciado ? { id: partido.id, jornadaId: jornada.id } : null,
+   });
+ };
 
   const selectEquipo = (label, value, onChange) => (
     <label className="mt-3 block text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -499,28 +524,73 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
       closeOnEsc={false}
       closeOnOverlay={false}
       footer={
-        <button type="button" disabled={!puedeContinuar} onClick={continuar} className={btnPrimario}>
-          Continuar
-        </button>
+        <div className="flex-col flex gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            disabled={!puedeContinuar}
+            onClick={continuar}
+            className={btnPrimario}
+          >
+            Continuar
+          </button>
+          <Link href="/" className={btnSecundario}>
+            Regresar a inicio
+          </Link>
+        </div>
       }
     >
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
         Torneo
-        <select value={opcion} onChange={(e) => elegirOpcion(e.target.value)} className={`${inputCls} mt-1 py-2`}>
-          <option value="" disabled>{loaded ? "Seleccione una opción" : "Cargando torneos…"}</option>
-          <option value={SIN_TORNEO}>Continuar sin torneo</option>
+        <select
+          value={opcion}
+          onChange={(e) => elegirOpcion(e.target.value)}
+          className={`${inputCls} mt-1 py-2`}
+        >
+          <option value="" disabled>
+            {loaded ? "Seleccione una opción" : "Cargando torneos…"}
+          </option>
+
+          <optgroup label="Partido libre">
+            <option value={SIN_TORNEO}>Continuar sin torneo</option>
+            <option value={PERSONALIZADO}>Personalizado…</option>
+          </optgroup>
           {torneos.length > 0 && (
             <optgroup label="Torneos">
               {torneos.map((t) => (
-                <option key={t.nombretorneo} value={t.nombretorneo}>{t.nombretorneo}</option>
+                <option key={t.nombretorneo} value={t.nombretorneo}>
+                  {t.nombretorneo}
+                </option>
               ))}
             </optgroup>
           )}
         </select>
       </label>
+      {opcion === PERSONALIZADO && (
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            Texto para el encabezado
+            <input
+              type="text"
+              autoFocus
+              maxLength={60}
+              value={textoPersonalizado}
+              onChange={(e) => setTextoPersonalizado(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && puedeContinuar) continuar();
+              }}
+              className={`${inputCls} mt-1 py-2`}
+            />
+          </label>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Se jugará como partido libre: no queda vinculado a ningún torneo.
+          </p>
+        </div>
+      )}
 
       {loaded && torneos.length === 0 && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No hay torneos registrados todavía.</p>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          No hay torneos registrados todavía.
+        </p>
       )}
 
       {/* Torneo sin iniciar: equipos a mano */}
@@ -532,27 +602,29 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
       )}
 
       {/* Torneo iniciado: partidos de la jornada activa */}
-      {torneo && iniciado && !leaderboard && (
-        <p className="mt-3 text-sm text-amber-600">El formato Standard aún no está disponible para jugar partidos.</p>
-      )}
-      {torneo && iniciado && leaderboard && !jornada && (
+      {torneo && iniciado && !jornada && (
         <p className="mt-3 text-sm text-red-600">
-          Este torneo no tiene una jornada activa. Genera una desde la sección Torneos.
+          Este torneo no tiene una jornada activa. Genera una desde la sección
+          Torneos.
         </p>
       )}
       {jornada && (
         <fieldset className="mt-3">
           <legend className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Jornada {jornada.numero} (activa): selecciona un partido
+            Jornada {jornada.numero} (activa)
+            {standard ? ` · ${etiquetaFase(jornada.fase)}` : ""}: selecciona un
+            partido
           </legend>
           <ul className="space-y-1">
             {jornada.partidos.map((p) => {
-              const jugado = p.estado === "jugado"
+              const jugado = p.estado !== "programado"; // jugado o anulado
               return (
                 <li key={p.id}>
                   <label
                     className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm ${
-                      jugado ? "opacity-50" : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      jugado
+                        ? "opacity-50"
+                        : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                     }`}
                   >
                     <input
@@ -563,59 +635,87 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
                       onChange={() => setPartidoId(p.id)}
                       className="accent-blue-600"
                     />
-                    <span className="flex-1">{p.equipoA} vs {p.equipoB}</span>
-                    {jugado && (
-                      <span className="text-xs">Jugado {p.resultado.puntosA}-{p.resultado.puntosB}</span>
+                    <span className="flex-1">
+                      {standard && (
+                        <span className="mr-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                          {etiquetaPartido(torneo, p)}
+                        </span>
+                      )}
+                      {p.equipoA} vs {p.equipoB}
+                    </span>
+                    {p.estado === "jugado" && (
+                      <span className="text-xs">
+                        Jugado {p.resultado.puntosA}-{p.resultado.puntosB}
+                      </span>
+                    )}
+                    {p.estado === "anulado" && (
+                      <span className="text-xs">Anulado (retiro)</span>
                     )}
                   </label>
                 </li>
-              )
+              );
             })}
           </ul>
           {!hayProgramados && (
             <p className="mt-2 text-sm text-amber-600">
-              Todos los partidos de esta jornada ya se jugaron. Finalízala desde la sección Torneos.
+              Todos los partidos de esta jornada ya se jugaron. Finalízala desde
+              la sección Torneos.
             </p>
           )}
         </fieldset>
       )}
 
       {pocosEquipos && (
-        <p className="mt-3 text-sm text-red-600">Este torneo necesita al menos 2 equipos registrados.</p>
+        <p className="mt-3 text-sm text-red-600">
+          Este torneo necesita al menos 2 equipos registrados.
+        </p>
       )}
       {mismoEquipo && (
-        <p className="mt-3 text-sm text-red-600">No puedes seleccionar el mismo equipo para A y B.</p>
+        <p className="mt-3 text-sm text-red-600">
+          No puedes seleccionar el mismo equipo para A y B.
+        </p>
       )}
       {excedidos.map((e) => (
         <p key={e.nombreequipo} className="mt-3 text-sm text-amber-600">
-          {e.nombreequipo} tiene {e.roster.length} jugadores y en la planilla caben {MAX_JUGADORES_PLANILLA}: se cargarán los primeros {MAX_JUGADORES_PLANILLA}.
+          {e.nombreequipo} tiene {e.roster.length} jugadores y en la planilla
+          caben {MAX_JUGADORES_PLANILLA}: se cargarán los primeros{" "}
+          {MAX_JUGADORES_PLANILLA}.
         </p>
       ))}
     </Modal>
-  )
+  );
 }
 
 // Vuelca el torneo y los equipos elegidos en los campos de la planilla.
 // `setValue` es el de react-hook-form (methods.setValue).
-export function aplicarTorneoAPlanilla(setValue, { torneo, equipoA, equipoB, partido }) {
+export function aplicarTorneoAPlanilla(setValue, { torneo, etiqueta, equipoA, equipoB, partido }) {
   const set = (name, value) => setValue(name, value, { shouldDirty: true })
 
-  set("tournament", torneo.nombretorneo) // select del banner
-  set("head.competition", torneo.nombretorneo) // "Competition" del encabezado
+  // Con torneo real usa su nombre; en partido libre usa "SIN TORNEO" o el texto personalizado
+  const nombre = torneo?.nombretorneo ?? etiqueta ?? ""
 
-  // Vínculo con el partido del torneo: se guarda con la planilla y permite registrar el resultado al terminar
-  if (partido) set("torneoRef", { torneo: torneo.nombretorneo, jornadaId: partido.jornadaId, partidoId: partido.id })
+  set("tournament", nombre)       // select del banner
+  set("head.competition", nombre) // "Competition" del encabezado
 
-  for (const [team, eq] of [["A", equipoA], ["B", equipoB]]) {
-    set(`head.team${team}`, eq.nombreequipo)
-    set(`team${team}.name`, eq.nombreequipo) // el onChange de head.teamX no se dispara con setValue
-    const coach = eq.cuerpotecnico.find((m) => m.cargo === CARGO_COACH)
-    const asistente = eq.cuerpotecnico.find((m) => m.cargo === CARGO_ASISTENTE)
-    set(`team${team}.coachName`, coach?.nombre ?? "")
-    set(`team${team}.assistantCoachName`, asistente?.nombre ?? "")
-    eq.roster.slice(0, MAX_JUGADORES_PLANILLA).forEach((j, i) => {
-      set(`team${team}.players.${i}.name`, j.nombre)
-      set(`team${team}.players.${i}.number`, j.dorsal)
-    })
+  // Solo los partidos de un torneo real se vinculan; así un partido libre
+  // nunca registra resultado en ningún torneo (el efecto de gameEnded sale si no hay torneoRef)
+  if (torneo && partido) {
+    set("torneoRef", { torneo: torneo.nombretorneo, jornadaId: partido.jornadaId, partidoId: partido.id })
+  }
+
+  if (equipoA || equipoB) {
+    for (const [team, eq] of [["A", equipoA], ["B", equipoB]]) {
+      if (!eq) continue
+      set(`head.team${team}`, eq.nombreequipo)
+      set(`team${team}.name`, eq.nombreequipo)
+      const coach = eq.cuerpotecnico.find((m) => m.cargo === CARGO_COACH)
+      const asistente = eq.cuerpotecnico.find((m) => m.cargo === CARGO_ASISTENTE)
+      set(`team${team}.coachName`, coach?.nombre ?? "")
+      set(`team${team}.assistantCoachName`, asistente?.nombre ?? "")
+      eq.roster.slice(0, MAX_JUGADORES_PLANILLA).forEach((j, i) => {
+        set(`team${team}.players.${i}.name`, j.nombre)
+        set(`team${team}.players.${i}.number`, j.dorsal)
+      })
+    }
   }
 }

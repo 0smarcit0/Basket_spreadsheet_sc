@@ -69,12 +69,12 @@ export default function App() {
               path="/continue_planilla"
             />
 
-            {/*<OptionButton
+            {<OptionButton
               title="Consultar planillas"
               description="Buscar y revisar registros anteriores"
               icon={Search}
               path="/search_planillas"
-            />*/}
+            />}
 
             {/*<OptionButton
               title="Tutorial"

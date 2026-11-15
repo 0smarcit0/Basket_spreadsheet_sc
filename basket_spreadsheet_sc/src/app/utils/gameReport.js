@@ -163,6 +163,8 @@ const MIN_TABLE_SPACE = 140 // espacio mínimo para empezar una tabla en la mism
 
 // Genera un PDF con la planilla (imagen) y debajo la tabla de ambos equipos.
 // Devuelve un File; quien llama decide si descargar o compartir.
+
+
 export async function generateFinalMatchReportFile(values, elementId = "planilla-form") {
   if (!useMatchStore.getState().gameEnded) return null
 
@@ -174,12 +176,14 @@ export async function generateFinalMatchReportFile(values, elementId = "planilla
   const ratio = canvas.height / canvas.width
   const imageData = canvas.toDataURL("image/jpeg", 0.92)
   canvas.width = canvas.height = 0 // libera memoria (importante en móviles)
+  
 
   // 2) Documento y planilla ajustada al ancho de la hoja
   const doc = new jsPDF({ unit: "pt", format: "a4" })
   const stamp = todayStamp()
   doc.setProperties({ title: `Reporte final partido ${stamp}` })
-
+  const logoData = await loadLogo()
+  const paintHeader = createHeaderPainter(doc, logoData)
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
 
@@ -199,6 +203,7 @@ export async function generateFinalMatchReportFile(values, elementId = "planilla
     // Si no queda espacio útil en la página, la tabla empieza en una nueva
     if (cursorY > pageH - TABLE_MARGIN - MIN_TABLE_SPACE) {
       doc.addPage()
+      paintHeader()
       cursorY = TABLE_MARGIN
     }
 
@@ -208,11 +213,12 @@ export async function generateFinalMatchReportFile(values, elementId = "planilla
     doc.setFont("helvetica", "bold")
     doc.setFontSize(13)
     doc.setTextColor(0)
-    doc.text(`Equipo ${team}: ${teamName}`, TABLE_MARGIN, cursorY + 12)
+    doc.text(`Equipo ${team}: ${teamName}`, TABLE_MARGIN, HEADER_BOTTOM + 20 + cursorY - TABLE_MARGIN)
 
     autoTable(doc, {
-      startY: cursorY + 20,
+      startY: cursorY + 70,
       margin: { top: TABLE_MARGIN, bottom: TABLE_MARGIN, left: TABLE_MARGIN, right: TABLE_MARGIN },
+      didDrawPage: paintHeader,
       head: [["Dorsal", "Nombre", "Tiros libres", "Tiros de 2", "Tiros de 3", "Puntos anotados", "Faltas cometidas"]],
       body: rows,
       foot: [footer],
@@ -234,7 +240,46 @@ export async function generateFinalMatchReportFile(values, elementId = "planilla
     cursorY = doc.lastAutoTable.finalY + 25
   }
 
+  // 4) Página de Notas del Cuerpo Arbitral con Header seguro
+  doc.addPage()
+  paintHeader() // Pinta el header institucional arriba
+
+  // Dejamos un espacio seguro debajo del header usando HEADER_BOTTOM
+  let notesY = HEADER_BOTTOM + 35 
+  
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(16)
+  doc.setTextColor(0)
+  doc.text("NOTAS DEL CUERPO ARBITRAL", TABLE_MARGIN, notesY)
+
+  notesY += 25
+  const notes = useMatchStore.getState().arbitratorNotes || []
+
+  if (notes.length === 0) {
+    doc.setFont("helvetica", "italic")
+    doc.setFontSize(11)
+    doc.setTextColor(100)
+    doc.text("No se agregaron notas arbitrales en este encuentro.", TABLE_MARGIN, notesY)
+  } else {
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(11)
+    doc.setTextColor(0)
+
+    notes.forEach((note, index) => {
+      const wrappedText = doc.splitTextToSize(`${index + 1}. ${note.text}`, pageW - TABLE_MARGIN * 2)
+      
+      // Si una nota excede el espacio de la página actual, saltamos de página y redibujamos el header
+      if (notesY + wrappedText.length * 15 > pageH - TABLE_MARGIN) {
+        doc.addPage()
+        paintHeader()
+        notesY = HEADER_BOTTOM + 35
+      }
+
+      doc.text(wrappedText, TABLE_MARGIN, notesY)
+      notesY += wrappedText.length * 15 + 10
+    })
+  }
+
   const blob = doc.output("blob")
   return new File([blob], `Reporte final partido ${stamp}.pdf`, { type: "application/pdf" })
 }
-

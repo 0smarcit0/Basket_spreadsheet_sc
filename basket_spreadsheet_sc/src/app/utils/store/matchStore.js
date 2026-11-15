@@ -34,7 +34,10 @@ const getInitialState = () => ({
   overtimeMarks: { A: {}, B: {} },
   finalRow: { A: null, B: null },
   halftimeBoundaries: {},
-   forfeit: null,
+  forfeit: null,
+  arbitratorNotes: [],
+  suspended: false,
+
 })
 export const useMatchStore = create((set, get) => ({
   ...getInitialState(),
@@ -53,88 +56,109 @@ export const useMatchStore = create((set, get) => ({
   ScoreCellNameB: "",
   scoredStackA: [],
   scoredStackB: [],
-  endMarks: { A: {}, B: {} }, 
+  endMarks: { A: {}, B: {} },
   overtimeMarks: { A: {}, B: {} },
   finalRow: { A: null, B: null },
   halftimeBoundaries: {},
   forfeit: null,
-
+  arbitratorNotes: [],
+  suspended: false,
+  
+  suspendMatch: () => set({ suspended: true }),
+  resumeMatch: () => set({ suspended: false }),
   endByForfeit: (option) =>
     set(() => {
-      const A = option === "A" || option === "both"
-      const B = option === "B" || option === "both"
-      const both = A && B
+      const A = option === "A" || option === "both";
+      const B = option === "B" || option === "both";
+      const both = A && B;
       return {
         gameEnded: true,
         forfeit: {
           absent: { A, B },
           winner: both ? null : A ? "B" : "A",
-          finalScore: both ? { A: 0, B: 0 } : A ? { A: 0, B: 20 } : { A: 20, B: 0 },
+          finalScore: both
+            ? { A: 0, B: 0 }
+            : A
+              ? { A: 0, B: 20 }
+              : { A: 20, B: 0 },
         },
-      }
-  }),
-  increaseTeamAscore: (value, cellName) => set((state) => {
-    const newScore = state.teamAcurrentScore + value;
-    return {
-      numberCellNameA: cellName,
-      ScoreCellNameA: cellName,
-      teamAcurrentScore: newScore,
-      scoredStackA: [...state.scoredStackA, newScore],
-    };
-  }),
-  increaseTeamBscore: (value, cellName) => set((state) => {
-    const newScore = state.teamBcurrentScore + value;
-    return {
-      numberCellNameB: cellName,
-      ScoreCellNameB: cellName,
-      teamBcurrentScore: newScore,
-      scoredStackB: [...state.scoredStackB, newScore],
-    };
-  }),
+      };
+    }),
+  increaseTeamAscore: (value, cellName) =>
+    set((state) => {
+      const newScore = state.teamAcurrentScore + value;
+      return {
+        numberCellNameA: cellName,
+        ScoreCellNameA: cellName,
+        teamAcurrentScore: newScore,
+        scoredStackA: [...state.scoredStackA, newScore],
+      };
+    }),
+  increaseTeamBscore: (value, cellName) =>
+    set((state) => {
+      const newScore = state.teamBcurrentScore + value;
+      return {
+        numberCellNameB: cellName,
+        ScoreCellNameB: cellName,
+        teamBcurrentScore: newScore,
+        scoredStackB: [...state.scoredStackB, newScore],
+      };
+    }),
 
-  undoTeamAscore: () => set((state) => {
-    const stack = state.scoredStackA.slice(0, -1);
-    return {
-      scoredStackA: stack,
-      teamAcurrentScore: stack.length ? stack[stack.length - 1] : 0,
-    };
-  }),
-  undoTeamBscore: () => set((state) => {
-    const stack = state.scoredStackB.slice(0, -1);
-    return {
-      scoredStackB: stack,
-      teamBcurrentScore: stack.length ? stack[stack.length - 1] : 0,
-    };
-  }),
+  undoTeamAscore: () =>
+    set((state) => {
+      const stack = state.scoredStackA.slice(0, -1);
+      return {
+        scoredStackA: stack,
+        teamAcurrentScore: stack.length ? stack[stack.length - 1] : 0,
+      };
+    }),
+  undoTeamBscore: () =>
+    set((state) => {
+      const stack = state.scoredStackB.slice(0, -1);
+      return {
+        scoredStackB: stack,
+        teamBcurrentScore: stack.length ? stack[stack.length - 1] : 0,
+      };
+    }),
   increaseQuarter: () =>
-  set((state) => {
-    const nextQ = state.quarter + 1;
-    return {
-      previousQuarter: state.quarter,
-      quarter: nextQ,
-      endMarks: state.quarter > 0 ? markLastScored(state, state.quarter) : state.endMarks,
-      overtimeMarks: nextQ >= 5 ? markOvertimeEntry(state) : state.overtimeMarks,
-    };
-  }),
+    set((state) => {
+      const nextQ = state.quarter + 1;
+      return {
+        previousQuarter: state.quarter,
+        quarter: nextQ,
+        endMarks:
+          state.quarter > 0
+            ? markLastScored(state, state.quarter)
+            : state.endMarks,
+        overtimeMarks:
+          nextQ >= 5 ? markOvertimeEntry(state) : state.overtimeMarks,
+      };
+    }),
 
   setQuarter: (q) =>
-  set((state) => ({
-    previousQuarter: state.quarter,
-    quarter: q,
-    endMarks:
-      state.quarter > 0 && q > state.quarter
-        ? markLastScored(state, state.quarter)
-        : state.endMarks,
-    overtimeMarks:
-      q >= 5 && q > state.quarter ? markOvertimeEntry(state) : state.overtimeMarks,
-    halftimeCaptured:
-      state.halftimeCaptured || (state.quarter === 2 && q === 3),
-  })),
+    set((state) => ({
+      previousQuarter: state.quarter,
+      quarter: q,
+      endMarks:
+        state.quarter > 0 && q > state.quarter
+          ? markLastScored(state, state.quarter)
+          : state.endMarks,
+      overtimeMarks:
+        q >= 5 && q > state.quarter
+          ? markOvertimeEntry(state)
+          : state.overtimeMarks,
+      halftimeCaptured:
+        state.halftimeCaptured || (state.quarter === 2 && q === 3),
+    })),
 
   endGame: () =>
     set((state) => ({
       gameEnded: true,
-      endMarks: state.quarter > 0 ? markLastScored(state, state.quarter) : state.endMarks,
+      endMarks:
+        state.quarter > 0
+          ? markLastScored(state, state.quarter)
+          : state.endMarks,
       finalRow: {
         A: state.teamAcurrentScore || null,
         B: state.teamBcurrentScore || null,
@@ -153,7 +177,20 @@ export const useMatchStore = create((set, get) => ({
 
   resetHalftimeBoundaries: () =>
     set({ halftimeBoundaries: {}, halftimeCaptured: false }),
+  addArbitratorNote: (text) =>
+    set((state) => ({
+      arbitratorNotes: [...state.arbitratorNotes, { id: Date.now(), text }],
+    })),
 
+  updateArbitratorNote: (id, text) =>
+    set((state) => ({
+      arbitratorNotes: state.arbitratorNotes.map((note) =>
+        note.id === id ? { ...note, text } : note,
+      ),
+    })),
 
-  
-}))
+  deleteArbitratorNote: (id) =>
+    set((state) => ({
+      arbitratorNotes: state.arbitratorNotes.filter((note) => note.id !== id),
+    })),
+}));

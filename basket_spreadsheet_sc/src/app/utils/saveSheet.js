@@ -24,3 +24,6 @@ export const loadSheet = () => {
     return false
   }
 }
+export function clearSheet() {
+  localStorage.removeItem(SAVE_KEY);
+}

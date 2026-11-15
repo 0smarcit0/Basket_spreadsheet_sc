@@ -9,7 +9,7 @@ import useTorneos from "../utils/hooks/useTorneos"
 
 export default function TorneosPage() {
   const { torneos, loaded, loadError, addTorneo, renameTorneo, removeTorneo, updateEquipo, addEquipo,
-    iniciarTorneo, generarJornada, finalizarJornada, realizarSorteo } =
+    iniciarTorneo, generarJornada, generarFaseEliminatoria, finalizarJornada, realizarSorteo, retirarEquipo } =
     useTorneos()
 
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -22,9 +22,7 @@ export default function TorneosPage() {
 
   const torneoAbierto = torneos.find((t) => t.nombretorneo === torneoSel)
 
-  useEffect(() => {
-    setIsDarkMode(document.documentElement.classList.contains("dark"))
-  }, [])
+  
 
   const toggleTheme = () => {
     const next = !isDarkMode
@@ -151,8 +149,10 @@ export default function TorneosPage() {
           onAddEquipo={addEquipo}
           onIniciarTorneo={iniciarTorneo}
           onGenerarJornada={generarJornada}
+          onGenerarFase={generarFaseEliminatoria}
           onFinalizarJornada={finalizarJornada}
           onRealizarSorteo={realizarSorteo}
+          onRetirarEquipo={retirarEquipo}
         />
       )}
 

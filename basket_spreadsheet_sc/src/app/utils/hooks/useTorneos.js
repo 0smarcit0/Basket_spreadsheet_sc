@@ -1,6 +1,7 @@
 "use client"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { emparejar, validarConfig, barajar, calcularTabla, torneoTerminado, TIPO_LEADERBOARD } from "../torneoLogic"
+import { validarConfig, barajar, nuevoId } from "../torneoLogic"
+import { generarGrupos, crearJornada, crearFaseEliminatoria, crearRetiro, hayEmpatesSinResolver } from "../torneoEstandar"
 
 /* ───────────── Persistencia en OPFS ─────────────
    Archivo: INFO_TORNEOS.TXT
@@ -20,7 +21,6 @@ export function normalizarEquipo(e) {
 }
 
 const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : 0)
-const nuevoId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
 function normalizarConfig(c) {
   if (!c || typeof c !== "object") return null
@@ -29,6 +29,9 @@ function normalizarConfig(c) {
     partidosEntreEquipos: ["1", "2", "mejor3"].includes(String(c.partidosEntreEquipos)) ? String(c.partidosEntreEquipos) : "1",
     equiposPorGrupo: c.equiposPorGrupo == null ? null : num(c.equiposPorGrupo) || null,
     clasificadosPorGrupo: c.clasificadosPorGrupo == null ? null : num(c.clasificadosPorGrupo) || null,
+    juegoTercerPuesto: c.juegoTercerPuesto === true,
+    // partidos por llave en la eliminatoria: "1" | "ida_vuelta" | "mejor3"
+    partidosEliminatoria: ["1", "ida_vuelta", "mejor3"].includes(c.partidosEliminatoria) ? c.partidosEliminatoria : "1",
     iniciadoEn: str(c.iniciadoEn),
   }
 }
@@ -46,9 +49,13 @@ function normalizarPartido(p) {
       : null
   return {
     id: str(p?.id) || nuevoId(),
+    fase: str(p?.fase) || "grupos", // grupos | dieciseisavos | octavos | cuartos | semifinales | tercer_puesto | final
+    llave: p?.llave == null ? null : num(p.llave), // posición en la llave (eliminatoria)
+    juego: p?.juego == null ? 1 : num(p.juego) || 1, // n.º de partido dentro de la serie
     equipoA: str(p?.equipoA),
     equipoB: str(p?.equipoB),
-    estado: p?.estado === "jugado" && resultado ? "jugado" : "programado",
+    // programado | jugado | anulado (cancelado por el retiro de un equipo)
+    estado: p?.estado === "anulado" ? "anulado" : p?.estado === "jugado" && resultado ? "jugado" : "programado",
     resultado: p?.estado === "jugado" ? resultado : null,
   }
 }
@@ -57,6 +64,8 @@ function normalizarJornada(j) {
   return {
     id: str(j?.id) || nuevoId(),
     numero: num(j?.numero),
+    fase: str(j?.fase) || "grupos",
+    juego: j?.juego == null ? 1 : num(j.juego) || 1,
     estado: j?.estado === "finalizada" ? "finalizada" : "activa",
     creadaEn: str(j?.creadaEn),
     partidos: arr(j?.partidos).map(normalizarPartido),
@@ -70,6 +79,25 @@ export function normalizarTorneo(t) {
     equipos: arr(t?.equipos).map(normalizarEquipo),
     config,
     jornadas: config ? arr(t?.jornadas).map(normalizarJornada) : [],
+    // Standard: grupos y llave de eliminación directa
+    grupos: config ? arr(t?.grupos).map((g) => ({ nombre: str(g?.nombre), equipos: arr(g?.equipos).map(str) })) : [],
+    eliminatoria:
+      config && t?.eliminatoria && typeof t.eliminatoria === "object"
+        ? {
+            tamano: num(t.eliminatoria.tamano),
+            fases: arr(t.eliminatoria.fases).map(str),
+            clasificados: arr(t.eliminatoria.clasificados).map((c) => ({
+              equipo: str(c?.equipo),
+              grupo: str(c?.grupo),
+              posicion: num(c?.posicion),
+              semilla: num(c?.semilla),
+            })),
+          }
+        : null,
+    // retiro voluntario: [{ equipo, fase, retiradoEn }]
+    retirados: config
+      ? arr(t?.retirados).map((r) => ({ equipo: str(r?.equipo), fase: str(r?.fase), retiradoEn: str(r?.retiradoEn) }))
+      : [],
     // orden del sorteo de desempate (D.1.3); null si no se hizo
     sorteo: config && Array.isArray(t?.sorteo) ? t.sorteo.map(str) : null,
   }
@@ -240,7 +268,7 @@ export default function useTorneos() {
       const nombre = norm(torneo?.nombretorneo)
       if (!nombre) return { ok: false, error: "El nombre del torneo no puede estar vacío." }
       if (ref.current.some((t) => clave(t.nombretorneo) === clave(nombre))) return { ok: false, error: "Ese torneo ya existe." }
-      return commit([...ref.current, { nombretorneo: nombre, equipos: arr(torneo?.equipos), config: null, jornadas: [], sorteo: null }])
+      return commit([...ref.current, { nombretorneo: nombre, equipos: arr(torneo?.equipos), config: null, jornadas: [], grupos: [], eliminatoria: null, retirados: [], sorteo: null }])
     },
     [commit]
   )
@@ -285,6 +313,11 @@ export default function useTorneos() {
                       partidos: j.partidos.map((p) => ({ ...p, equipoA: renombrar(p.equipoA), equipoB: renombrar(p.equipoB) })),
                     })),
                 sorteo: t.sorteo ? t.sorteo.map(renombrar) : t.sorteo,
+                grupos: t.grupos.map((g) => ({ ...g, equipos: g.equipos.map(renombrar) })),
+                retirados: t.retirados.map((r) => ({ ...r, equipo: renombrar(r.equipo) })),
+                eliminatoria: t.eliminatoria
+                  ? { ...t.eliminatoria, clasificados: t.eliminatoria.clasificados.map((c) => ({ ...c, equipo: renombrar(c.equipo) })) }
+                  : t.eliminatoria,
               }
         )
       )
@@ -338,7 +371,10 @@ export default function useTorneos() {
             }
           }
         }
-        nuevos.push({ nombretorneo: nombre, equipos, config: t.config, jornadas: t.jornadas, sorteo: t.sorteo })
+        if (t.grupos.some((g) => g.equipos.some((n) => !nombresEq.has(n)))) {
+          return { ok: false, error: `Torneo «${nombre}»: un grupo usa equipos que no existen en el torneo.` }
+        }
+        nuevos.push({ nombretorneo: nombre, equipos, config: t.config, jornadas: t.jornadas, grupos: t.grupos, eliminatoria: t.eliminatoria, retirados: t.retirados, sorteo: t.sorteo })
       }
       if (nuevos.length === 0) return { ok: false, error: "El archivo no contiene torneos." }
 
@@ -420,49 +456,42 @@ export default function useTorneos() {
           partidosEntreEquipos: config.partidosEntreEquipos,
           equiposPorGrupo: standard ? Number(config.equiposPorGrupo) : null,
           clasificadosPorGrupo: standard ? Number(config.clasificadosPorGrupo) : null,
+          juegoTercerPuesto: standard && config.juegoTercerPuesto === true,
+          partidosEliminatoria: standard && config.partidosEliminatoria ? config.partidosEliminatoria : "1",
           iniciadoEn: new Date().toISOString(),
         },
         jornadas: [],
+        sorteo: null,
+        retirados: [],
+        eliminatoria: null,
+        // Standard: grupos al azar; los equipos que sobran se reparten de a uno por grupo
+        grupos: standard ? generarGrupos(torneo.equipos.map((e) => e.nombreequipo), Number(config.equiposPorGrupo)) : [],
       })
     },
     [commit]
   )
 
-  // Leaderboard: crea una jornada con `cantidad` partidos aleatorios entre equipos que aún deben enfrentarse
+  // Crea una jornada con `cantidad` partidos aleatorios entre equipos que aún deben enfrentarse
+  // (Leaderboard: cualquiera; Standard: dentro de cada grupo)
   const generarJornada = useCallback(
     async (nombreTorneo, cantidad) => {
       const torneo = ref.current.find((t) => t.nombretorneo === nombreTorneo)
       if (!torneo) return { ok: false, error: "El torneo no existe." }
-      if (!torneo.config) return { ok: false, error: "El torneo aún no ha iniciado." }
-      if (torneo.config.tipo !== TIPO_LEADERBOARD) return { ok: false, error: "Esta opción solo está disponible en el formato Leaderboard." }
-      if (torneo.jornadas.some((j) => j.estado === "activa")) {
-        return { ok: false, error: "Finaliza la jornada activa antes de generar otra." }
-      }
+      const r = crearJornada(torneo, cantidad)
+      if (!r.ok) return r
+      return actualizarTorneo(torneo, r.cambios)
+    },
+    [commit]
+  )
 
-      const n = Number(cantidad)
-      const max = Math.floor(torneo.equipos.length / 2)
-      if (!Number.isInteger(n) || n < 1 || n > max) {
-        return { ok: false, error: `La cantidad de partidos debe ser un entero entre 1 y ${max}.` }
-      }
-
-      const nombres = torneo.equipos.map((e) => e.nombreequipo)
-      const pares = emparejar(nombres, torneo.jornadas, torneo.config.partidosEntreEquipos, n)
-      if (pares.length === 0) return { ok: false, error: "Ya no quedan emparejamientos disponibles: todos los equipos jugaron entre sí." }
-      if (pares.length < n) {
-        return {
-          ok: false,
-          error: `Solo se pudieron generar ${pares.length} ${pares.length === 1 ? "partido" : "partidos"} con los emparejamientos disponibles (un equipo no juega dos veces en la misma jornada). Reduce la cantidad.`,
-        }
-      }
-
-      const jornada = {
-        id: nuevoId(),
-        numero: torneo.jornadas.length + 1,
-        estado: "activa",
-        creadaEn: new Date().toISOString(),
-        partidos: pares.map(([a, b]) => ({ id: nuevoId(), equipoA: a, equipoB: b, estado: "programado", resultado: null })),
-      }
-      return actualizarTorneo(torneo, { jornadas: [...torneo.jornadas, jornada] })
+  // Standard: genera la primera fase de la eliminatoria (al terminar los grupos) o la siguiente
+  const generarFaseEliminatoria = useCallback(
+    async (nombreTorneo) => {
+      const torneo = ref.current.find((t) => t.nombretorneo === nombreTorneo)
+      if (!torneo) return { ok: false, error: "El torneo no existe." }
+      const r = crearFaseEliminatoria(torneo)
+      if (!r.ok) return r
+      return actualizarTorneo(torneo, r.cambios)
     },
     [commit]
   )
@@ -474,7 +503,7 @@ export default function useTorneos() {
       const jornada = torneo?.jornadas.find((j) => j.id === jornadaId)
       if (!jornada) return { ok: false, error: "La jornada no existe." }
       if (jornada.estado !== "activa") return { ok: false, error: "La jornada ya fue finalizada." }
-      const pendientes = jornada.partidos.filter((p) => p.estado !== "jugado").length
+      const pendientes = jornada.partidos.filter((p) => p.estado === "programado").length
       if (pendientes > 0) return { ok: false, error: `Aún faltan ${pendientes} partidos por completar.` }
 
       return actualizarTorneo(torneo, {
@@ -493,6 +522,7 @@ export default function useTorneos() {
       const partido = jornada?.partidos.find((p) => p.id === partidoId)
       if (!partido) return { ok: false, error: "El partido ya no existe en el torneo." }
       if (jornada.estado !== "activa") return { ok: false, error: "La jornada de este partido ya fue finalizada." }
+      if (partido.estado === "anulado") return { ok: false, error: "Este partido fue anulado (un equipo se retiró del torneo)." }
       if (partido.estado === "jugado") return { ok: false, error: "Este partido ya tiene un resultado registrado." }
 
       const resultado = {
@@ -512,16 +542,27 @@ export default function useTorneos() {
     [commit]
   )
 
-  // D.1.3: si al terminar el torneo quedan equipos empatados que ningún criterio resuelve, se define por sorteo
+  // D.1.3: si quedan equipos empatados que ningún criterio resuelve, se define por sorteo
   const realizarSorteo = useCallback(
     async (nombreTorneo) => {
       const torneo = ref.current.find((t) => t.nombretorneo === nombreTorneo)
       if (!torneo) return { ok: false, error: "El torneo no existe." }
-      if (!torneoTerminado(torneo)) return { ok: false, error: "El sorteo solo puede realizarse cuando el torneo haya finalizado." }
       if (torneo.sorteo) return { ok: false, error: "El sorteo ya fue realizado." }
-      if (!calcularTabla(torneo).some((f) => f.empate)) return { ok: false, error: "No hay empates que requieran sorteo." }
+      if (!hayEmpatesSinResolver(torneo)) return { ok: false, error: "No hay empates que requieran sorteo." }
 
       return actualizarTorneo(torneo, { sorteo: barajar(torneo.equipos.map((e) => e.nombreequipo)) })
+    },
+    [commit]
+  )
+
+  // Retiro voluntario de un equipo (D.5.1): se anulan sus partidos y, en la eliminatoria, avanza su rival
+  const retirarEquipo = useCallback(
+    async (nombreTorneo, equipo) => {
+      const torneo = ref.current.find((t) => t.nombretorneo === nombreTorneo)
+      if (!torneo) return { ok: false, error: "El torneo no existe." }
+      const r = crearRetiro(torneo, equipo)
+      if (!r.ok) return r
+      return actualizarTorneo(torneo, r.cambios)
     },
     [commit]
   )
@@ -540,6 +581,6 @@ export default function useTorneos() {
     torneos, loaded, loadError,
     addTorneo, renameTorneo, removeTorneo, updateEquipo, addEquipo,
     importTorneos, importEquipos, reemplazarTodo,
-    iniciarTorneo, generarJornada, finalizarJornada, registrarResultado, realizarSorteo,
+    iniciarTorneo, generarJornada, generarFaseEliminatoria, finalizarJornada, registrarResultado, realizarSorteo, retirarEquipo,
   }
 }

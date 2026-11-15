@@ -56,7 +56,7 @@ export default function DorsalSelect({ gname, players = [], color, handleChange 
                 }}
             >
                 <option value=""></option>
-                {players.map((player) => (
+                { players.map((player) => (
                     <option
                         key={player.number}
                         value={player.number}

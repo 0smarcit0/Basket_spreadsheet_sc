@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ChevronRight, Download, Upload } from "lucide-react"
 import Navbar from "../components/Navbar"
-import useTorneos from "../utils/hooks/Usetorneos"
+import useTorneos from "../utils/hooks/useTorneos"
 import {
   Aviso,
   Advertencia,

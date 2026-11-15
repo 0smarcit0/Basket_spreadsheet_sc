@@ -7,7 +7,7 @@ import { useMatchStore } from "../../utils/store/matchStore";
 export function useTeamPlayers(team) {
   const { watch, getValues } = useFormContext();
   const quarter = useMatchStore((state) => state.quarter); 
-
+  const gameEnded = useMatchStore((state) => state.gameEnded);
   const getProcessedPlayers = () => {
     const currentPlayers = getValues(`team${team}.players`) ?? [];
     return currentPlayers
@@ -15,12 +15,26 @@ export function useTeamPlayers(team) {
       .map((p) => ({ number: p.number, name: p.name }));
   };
 
-  const [players, setPlayers] = useState(getProcessedPlayers);
-
+  const [players, setPlayers] = useState(() => {
+    // Si el partido no ha comenzado (quarter === 0) Y el partido no ha finalizado 
+    // (lo que indicaría que es una planilla nueva vacía), devolvemos un arreglo vacío
+    // para evitar precargar basura o disparar estados prematuros.
+    if (quarter === 0 && !gameEnded) {
+      const initialCheck = getProcessedPlayers();
+      // Si por un reseteo de formulario ya trajera datos cargados (como al cargar "last"),
+      // permitimos leerlos solo si el formulario ya tiene datos explícitos.
+      if (initialCheck.length === 0) return [];
+    }
+    return getProcessedPlayers();
+  });
   useEffect(() => {
     // Si el partido no ha comenzado (quarter === 0), detenemos la ejecución.
     // Esto evita re-renders y actualizaciones mientras se llena la plantilla inicial.
-    if (quarter === 0) return;
+    if (quarter === 0 && !gameEnded) {
+      setPlayers([]);
+      return;
+    }
+   
 
     // Cuando el quarter cambia de 0 a un número mayor, forzamos una actualización 
     // inmediata para reflejar los jugadores que se llenaron durante el quarter 0.
@@ -51,8 +65,7 @@ export function useTeamPlayers(team) {
 const COLUMN_RANGES = [[1, 40], [41, 80], [81, 120], [121, 160]]
 
 export default function RunningScoreForm() {
-    const playersA = useTeamPlayers("A")
-    const playersB = useTeamPlayers("B")
+
 
     // Canasta que se está modificando: { team, row } o null
     const [target, setTarget] = useState(null)
@@ -72,8 +85,8 @@ export default function RunningScoreForm() {
         <div className="flex flex-row border border-b-2">
             {COLUMN_RANGES.map((range) => (
                 <div key={range[0]} className="flex flex-row">
-                    <ScoreColumn team="A" range={range} players={playersA} handleModify={handleModify} />
-                    <ScoreColumn team="B" range={range} players={playersB} handleModify={handleModify} />
+                    <ScoreColumn team="A" range={range} players={useTeamPlayers("A")} handleModify={handleModify} />
+                    <ScoreColumn team="B" range={range} players={useTeamPlayers("B")} handleModify={handleModify} />
                 </div>
             ))}
         </div>
