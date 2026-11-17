@@ -2,16 +2,17 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const VERSION = "v4"; // súbelo (v2, v3...) para invalidar todos los caches
+const VERSION = "v5"; // súbelo (v2, v3...) para invalidar todos los caches
 
-// Rutas a precachear al instalar el SW (añade las tuyas)
 const PRECACHE_ROUTES = [
   "/",
   "/new_planilla",
   "/continue_planilla",
   "/torneos",
   "/offline",
-  "/login"
+  "/login",
+  "/search_planillas",
+  "/settings"
 ];
 
 // Archivos extra a precachear

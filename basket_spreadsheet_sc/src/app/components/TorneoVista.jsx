@@ -351,7 +351,7 @@ function SeccionLlaves({ torneo }) {
         <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">{etiquetaFormatoEliminatoria(modo)}</span>
       </h3>
 
-      <div className="mb-3 flex flex-wrap gap-1 rounded-lg bg-gray-200 p-1 dark:bg-gray-800" role="tablist">
+      <div className="inline-flex rounded-lg bg-gray-200 p-1 dark:bg-gray-800 mb-1" role="tablist">
         {fases.map((f) => (
           <button
             key={f}
@@ -425,9 +425,7 @@ function ClasificacionFinal({ filas }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Los eliminados de una misma fase se ordenan por su puesto en el grupo, récord, diferencia y puntos anotados en la fase de grupos (D.5.2).
-      </p>
+      
     </section>
   )
 }
@@ -548,17 +546,24 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
 
   return (
     <div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        {resumen.map(([k, v]) => (
-          <div key={k} className="flex gap-2">
-            <dt className="text-gray-500 dark:text-gray-400">{k}:</dt>
-            <dd className="font-medium">{v}</dd>
-          </div>
-        ))}
-      </dl>
+      <details className="rounded-md border border-gray-200 dark:border-gray-800">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          Información general del torneo
+        </summary>
+        <div className="border-t border-gray-200 p-3 dark:border-gray-800">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            {resumen.map(([k, v]) => (
+              <div key={k} className="flex gap-2">
+                <dt className="text-gray-500 dark:text-gray-400">{k}:</dt>
+                <dd className="font-medium">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </details>
 
       <section className="mt-5">
-        <h3 className={tituloSeccion}>Jornadas</h3>
+        <h3 className={tituloSeccion}>Gestion de Jornadas</h3>
 
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -569,14 +574,16 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
               max={max}
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
-              placeholder={`Máx. ${max}`}
+              placeholder={`Máx. ${max} ${max === 1 ? "partido" : "partidos"}`}
               disabled={!puedeGenerarJornada || procesando}
               className={`${inputCls} mt-1 w-40`}
             />
           </label>
           <button
             type="button"
-            onClick={() => ejecutar(() => onGenerarJornada(torneo.nombretorneo, cantidad))}
+            onClick={() =>
+              ejecutar(() => onGenerarJornada(torneo.nombretorneo, cantidad))
+            }
             disabled={!puedeGenerarJornada || procesando || !cantidad}
             className={btnPrimario}
           >
@@ -594,9 +601,13 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
           )}
           <button
             type="button"
-            onClick={() => ejecutar(() => onFinalizarJornada(torneo.nombretorneo, activa.id))}
+            onClick={() =>
+              ejecutar(() => onFinalizarJornada(torneo.nombretorneo, activa.id))
+            }
             disabled={!activa || pendientes > 0 || procesando}
-            className={btnSecundario + " border border-gray-300 dark:border-gray-700"}
+            className={
+              btnSecundario + " border border-gray-300 dark:border-gray-700"
+            }
           >
             Finalizar jornada
           </button>
@@ -612,39 +623,55 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
 
         {activa && pendientes > 0 && (
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Para finalizar la jornada faltan {pendientes} {pendientes === 1 ? "partido" : "partidos"} por completar.
+            Para finalizar la jornada faltan {pendientes}{" "}
+            {pendientes === 1 ? "partido" : "partidos"} por completar.
           </p>
         )}
-        {standard && gruposListos && !torneo.eliminatoria && !activa && !finalizado && (
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            La fase de grupos terminó. Genera la fase eliminatoria.
-          </p>
-        )}
+        {standard &&
+          gruposListos &&
+          !torneo.eliminatoria &&
+          !activa &&
+          !finalizado && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              La fase de grupos terminó. Genera la fase eliminatoria.
+            </p>
+          )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </section>
 
       {retirando && (
-        <RetirarEquipoModal torneo={torneo} onClose={() => setRetirando(false)} onRetirar={onRetirarEquipo} />
+        <RetirarEquipoModal
+          torneo={torneo}
+          onClose={() => setRetirando(false)}
+          onRetirar={onRetirarEquipo}
+        />
       )}
 
       {finalizado && (
         <div className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-900/30 dark:text-green-300">
-          {standard
-            ? <>Torneo finalizado. Campeón: <b>{campeon(torneo)}</b>.</>
-            : "Torneo finalizado: todos los equipos ya jugaron entre sí. Esta es la tabla de posiciones final."}
+          {standard ? (
+            <>
+              Torneo finalizado. Campeón: <b>{campeon(torneo)}</b>.
+            </>
+          ) : (
+            "Torneo finalizado: todos los equipos ya jugaron entre sí. Esta es la tabla de posiciones final."
+          )}
         </div>
       )}
 
       {sorteoPendiente && (
         <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
           <p>
-            Hay equipos empatados que ningún criterio del reglamento logra desempatar
+            Hay equipos empatados que ningún criterio del reglamento logra
+            desempatar
             {standard ? "" : " (marcados con «=»)"}. Se definen por sorteo.
           </p>
           <button
             type="button"
             disabled={procesando}
-            onClick={() => ejecutar(() => onRealizarSorteo(torneo.nombretorneo))}
+            onClick={() =>
+              ejecutar(() => onRealizarSorteo(torneo.nombretorneo))
+            }
             className={`${btnPrimario} mt-2`}
           >
             Realizar sorteo de desempate
@@ -655,7 +682,8 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
       {activa && (
         <section className="mt-5">
           <h3 className={tituloSeccion}>
-            Jornada {activa.numero} (activa){standard ? ` · ${etiquetaFase(activa.fase)}` : ""}
+            Jornada {activa.numero} (activa)
+            {standard ? ` · ${etiquetaFase(activa.fase)}` : ""}
           </h3>
           <ul className={listaCls}>
             {activa.partidos.map((p) => (
@@ -665,7 +693,9 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
         </section>
       )}
 
-      {standard && finalFilas.length > 0 && <ClasificacionFinal filas={finalFilas} />}
+      {standard && finalFilas.length > 0 && (
+        <ClasificacionFinal filas={finalFilas} />
+      )}
 
       {standard ? (
         <>
@@ -684,10 +714,15 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
           <h3 className={tituloSeccion}>Historial de partidos</h3>
           <div className="space-y-2">
             {finalizadas.map((j) => (
-              <details key={j.id} className="rounded-md border border-gray-200 dark:border-gray-800">
+              <details
+                key={j.id}
+                className="rounded-md border border-gray-200 dark:border-gray-800"
+              >
                 <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
                   Jornada {j.numero}
-                  {standard ? ` · ${etiquetaFase(j.fase)}` : ""} ({j.partidos.length} {j.partidos.length === 1 ? "partido" : "partidos"})
+                  {standard ? ` · ${etiquetaFase(j.fase)}` : ""} (
+                  {j.partidos.length}{" "}
+                  {j.partidos.length === 1 ? "partido" : "partidos"})
                 </summary>
                 <ul className="divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
                   {j.partidos.map((p) => (
@@ -700,7 +735,7 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
         </section>
       )}
     </div>
-  )
+  );
 }
 
 /* ───────────── Vista del torneo (según haya iniciado o no) ───────────── */

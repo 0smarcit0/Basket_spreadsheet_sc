@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { ChevronRight, Plus, Trash2, X } from "lucide-react"
+import { ChevronRight, Plus, Trash2, X, Pencil, Check } from "lucide-react"
 import Modal from "./Modal"
 import VistaTorneo from "./TorneoVista"
 import { jornadaActiva } from "../utils/torneoLogic"
@@ -81,7 +81,10 @@ function FormEquipo({ value, onChange }) {
 
           {value[s.lista].length > 0 && (
             <div className="space-y-2">
-              <div className="grid gap-2 text-xs text-gray-500 dark:text-gray-400" style={{ gridTemplateColumns: s.grid }}>
+              <div
+                className="grid gap-2 text-xs text-gray-500 dark:text-gray-400"
+                style={{ gridTemplateColumns: s.grid }}
+              >
                 {s.campos.map(([k, label]) => (
                   <span key={k}>{label}</span>
                 ))}
@@ -89,7 +92,11 @@ function FormEquipo({ value, onChange }) {
               </div>
 
               {value[s.lista].map((fila, i) => (
-                <div key={i} className="grid gap-2" style={{ gridTemplateColumns: s.grid }}>
+                <div
+                  key={i}
+                  className="grid gap-2"
+                  style={{ gridTemplateColumns: s.grid }}
+                >
                   {s.campos.map(([k, label, opciones]) =>
                     opciones ? (
                       <select
@@ -102,7 +109,13 @@ function FormEquipo({ value, onChange }) {
                         <option value="">Seleccione…</option>
                         {opciones.map((o) => (
                           // un cargo ya usado en otra fila no se puede repetir
-                          <option key={o} value={o} disabled={value[s.lista].some((f, idx) => idx !== i && f[k] === o)}>
+                          <option
+                            key={o}
+                            value={o}
+                            disabled={value[s.lista].some(
+                              (f, idx) => idx !== i && f[k] === o,
+                            )}
+                          >
                             {o}
                           </option>
                         ))}
@@ -116,7 +129,7 @@ function FormEquipo({ value, onChange }) {
                         aria-label={`${label} ${i + 1}`}
                         className={inputCls}
                       />
-                    )
+                    ),
                   )}
                   <button
                     type="button"
@@ -135,17 +148,19 @@ function FormEquipo({ value, onChange }) {
             <button
               type="button"
               onClick={() => addFila(s)}
-              className="mt-2 flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              className="mt-3 flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
               <Plus size={14} /> {s.agregar}
             </button>
           ) : (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Máximo alcanzado ({s.max}).</p>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Máximo alcanzado ({s.max}).
+            </p>
           )}
         </section>
       ))}
     </div>
-  )
+  );
 }
 
 /* ───────────── Crear torneo ───────────── */
@@ -312,6 +327,62 @@ function EquipoModal({ titulo, inicial, textoGuardar, onClose, onSave }) {
   )
 }
 
+function AccionesTorneo({ nombre, onRename, onDelete, error }) {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(nombre)
+  const [err, setErr] = useState("")
+
+  const guardar = async () => {
+    const res = await onRename(nombre, valor)
+    if (!res.ok) return setErr(res.error)
+    setEditando(false)
+    setErr("")
+  }
+  const cancelar = () => {
+    setEditando(false)
+    setErr("")
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {editando ? (
+        <>
+          <input
+            autoFocus
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") guardar()
+              if (e.key === "Escape") cancelar()
+            }}
+            aria-label="Nuevo nombre del torneo"
+            className={`${inputCls} w-56`}
+          />
+          <button type="button" onClick={guardar} aria-label="Guardar"
+            className="rounded p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-gray-800">
+            <Check size={16} />
+          </button>
+          <button type="button" onClick={cancelar} aria-label="Cancelar"
+            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X size={16} />
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="button" onClick={() => { setValor(nombre); setEditando(true) }} aria-label="Renombrar torneo"
+            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <Pencil size={16} />
+          </button>
+          <button type="button" onClick={onDelete} aria-label="Eliminar torneo"
+            className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-gray-800">
+            <Trash2 size={16} />
+          </button>
+        </>
+      )}
+      {(err || error) && <span className="ml-2 text-xs text-red-600">{err || error}</span>}
+    </div>
+  )
+}
 // onUpdateEquipo(nombreTorneo, nombreEquipoViejo, equipoNuevo) y
 // onAddEquipo(nombreTorneo, equipoNuevo) -> Promise<{ ok, error? }>
 // onIniciarTorneo(nombreTorneo, config), onGenerarJornada(nombreTorneo, cantidad), onGenerarFase(nombreTorneo),
@@ -328,34 +399,67 @@ export function DetalleTorneoModal({
   onFinalizarJornada,
   onRealizarSorteo,
   onRetirarEquipo,
+  onRenameTorneo, onRemoveTorneo,
 }) {
   const [vista, setVista] = useState("equipos") // "equipos" | "torneo"
   const [equipoSel, setEquipoSel] = useState(null) // nombre del equipo abierto
   const [agregando, setAgregando] = useState(false)
+  const [borrando, setBorrando] = useState(false)      
+  const [errorBorrado, setErrorBorrado] = useState("")
   const equipo = torneo.equipos.find((e) => e.nombreequipo === equipoSel)
   const iniciado = !!torneo.config
 
+  const confirmarBorrado = async () => {
+    const res = await onRemoveTorneo(torneo.nombretorneo)
+    if (!res.ok) setErrorBorrado(res.error)
+    setBorrando(false)
+  }
+
   return (
     <>
-      <Modal open title={torneo.nombretorneo} size="xl" className={MODAL_GRANDE} onClose={onClose}>
-        {/* Toggle superior: Equipos / Torneo */}
-        <div className="mb-4 inline-flex rounded-lg bg-gray-200 p-1 dark:bg-gray-800" role="tablist">
-          {[["equipos", "Equipos"], ["torneo", "Torneo"]].map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={vista === id}
-              onClick={() => setVista(id)}
-              className={`rounded-md px-5 py-1.5 text-sm font-medium transition-colors ${
-                vista === id
-                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white"
-                  : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <Modal
+        open
+        title={torneo.nombretorneo}
+        size="xl"
+        className={MODAL_GRANDE}
+        onClose={onClose}
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex rounded-lg bg-gray-200 p-1 dark:bg-gray-800"
+            role="tablist"
+          >
+            {[
+              ["equipos", "Equipos"],
+              ["torneo", "Torneo"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={vista === id}
+                onClick={() => setVista(id)}
+                className={`rounded-md px-5 py-1.5 text-sm font-medium transition-colors ${
+                  vista === id
+                    ? "bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white"
+                    : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {vista === "equipos" && (
+            <AccionesTorneo
+              nombre={torneo.nombretorneo}
+              onRename={onRenameTorneo}
+              onDelete={() => {
+                setErrorBorrado("");
+                setBorrando(true);
+            }}
+            error={errorBorrado}
+          />)}
         </div>
 
         {vista === "torneo" ? (
@@ -372,8 +476,10 @@ export function DetalleTorneoModal({
           <>
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {torneo.equipos.length} {torneo.equipos.length === 1 ? "equipo" : "equipos"}
-                {iniciado && " · El torneo ya inició: no se pueden agregar equipos."}
+                {torneo.equipos.length}{" "}
+                {torneo.equipos.length === 1 ? "equipo" : "equipos"}
+                {iniciado &&
+                  " · El torneo ya inició: no se pueden agregar equipos."}
               </p>
               <button
                 type="button"
@@ -386,7 +492,9 @@ export function DetalleTorneoModal({
             </div>
 
             {torneo.equipos.length === 0 ? (
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">Este torneo no tiene equipos registrados.</p>
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                Este torneo no tiene equipos registrados.
+              </p>
             ) : (
               <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
                 {torneo.equipos.map((e) => (
@@ -397,9 +505,12 @@ export function DetalleTorneoModal({
                       className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       <span className="flex-1">
-                        <span className="block text-sm font-medium">{e.nombreequipo}</span>
+                        <span className="block text-sm font-medium">
+                          {e.nombreequipo}
+                        </span>
                         <span className="block text-xs text-gray-500 dark:text-gray-400">
-                          {e.roster.length} jugadores, {e.cuerpotecnico.length} en cuerpo técnico
+                          {e.roster.length} jugadores, {e.cuerpotecnico.length}{" "}
+                          en cuerpo técnico
                         </span>
                       </span>
                       <ChevronRight size={16} className="text-gray-400" />
@@ -419,7 +530,9 @@ export function DetalleTorneoModal({
           inicial={equipo}
           textoGuardar="Guardar cambios"
           onClose={() => setEquipoSel(null)}
-          onSave={(nuevo) => onUpdateEquipo(torneo.nombretorneo, equipo.nombreequipo, nuevo)}
+          onSave={(nuevo) =>
+            onUpdateEquipo(torneo.nombretorneo, equipo.nombreequipo, nuevo)
+          }
         />
       )}
 
@@ -434,7 +547,7 @@ export function DetalleTorneoModal({
         />
       )}
     </>
-  )
+  );
 }
 
 /* ───────────── Planilla nueva: elegir torneo y partido/equipos ───────────── */
