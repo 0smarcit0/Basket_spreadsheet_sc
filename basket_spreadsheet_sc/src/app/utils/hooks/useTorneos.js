@@ -1,8 +1,7 @@
 "use client"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { validarConfig, barajar, nuevoId } from "../torneoLogic"
-import { generarGrupos, crearJornada, crearFaseEliminatoria, crearRetiro, hayEmpatesSinResolver } from "../torneoEstandar"
-
+import { generarGrupos, crearJornada, crearFaseEliminatoria, crearRetiro, hayEmpatesSinResolver, calendarioAutomatico, finalizarCompletas } from "../torneoEstandar"
 /* ───────────── Persistencia en OPFS ─────────────
    Archivo: INFO_TORNEOS.TXT
    { "torneos": [ { nombretorneo, equipos: [ { nombreequipo, roster, cuerpotecnico } ] } ] }
@@ -33,6 +32,7 @@ function normalizarConfig(c) {
     // partidos por llave en la eliminatoria: "1" | "ida_vuelta" | "mejor3"
     partidosEliminatoria: ["1", "ida_vuelta", "mejor3"].includes(c.partidosEliminatoria) ? c.partidosEliminatoria : "1",
     iniciadoEn: str(c.iniciadoEn),
+    generacionJornadas: c.generacionJornadas === "automatico" ? "automatico" : "manual",
   }
 }
 
@@ -66,7 +66,7 @@ function normalizarJornada(j) {
     numero: num(j?.numero),
     fase: str(j?.fase) || "grupos",
     juego: j?.juego == null ? 1 : num(j.juego) || 1,
-    estado: j?.estado === "finalizada" ? "finalizada" : "activa",
+    estado: j?.estado === "finalizada" ? "finalizada" : j?.estado === "pendiente" ? "pendiente" : "activa",
     creadaEn: str(j?.creadaEn),
     partidos: arr(j?.partidos).map(normalizarPartido),
   }
@@ -147,7 +147,7 @@ function guardarTorneos(torneos) {
 const DORSAL_UNICO_EN_TORNEO = false
 
 // Límites de un equipo y cargos permitidos del cuerpo técnico (la planilla tiene 1 coach y 1 asistente)
-export const MAX_JUGADORES = 12
+export const MAX_JUGADORES = 20
 export const MAX_CUERPO_TECNICO = 2
 export const CARGO_COACH = "Coach"
 export const CARGO_ASISTENTE = "Coach asistente"
@@ -449,24 +449,42 @@ export default function useTorneos() {
       const error = validarConfig(config, torneo.equipos.length)
       if (error) return { ok: false, error }
 
-      const standard = config.tipo === "standard"
+      const standard = config.tipo === "standard";
+      const automatico = config.generacionJornadas === "automatico";
+      const nombres = torneo.equipos.map((e) => e.nombreequipo);
+      const grupos = standard
+        ? generarGrupos(nombres, Number(config.equiposPorGrupo))
+        : [];
+      // Leaderboard = un solo grupo con todos
+      const jornadas = automatico
+        ? calendarioAutomatico(
+            standard ? grupos : [{ nombre: "A", equipos: nombres }],
+            config.partidosEntreEquipos,
+          )
+        : [];
+
       return actualizarTorneo(torneo, {
         config: {
           tipo: config.tipo,
           partidosEntreEquipos: config.partidosEntreEquipos,
+          generacionJornadas: automatico ? "automatico" : "manual",
           equiposPorGrupo: standard ? Number(config.equiposPorGrupo) : null,
-          clasificadosPorGrupo: standard ? Number(config.clasificadosPorGrupo) : null,
+          clasificadosPorGrupo: standard
+            ? Number(config.clasificadosPorGrupo)
+            : null,
           juegoTercerPuesto: standard && config.juegoTercerPuesto === true,
-          partidosEliminatoria: standard && config.partidosEliminatoria ? config.partidosEliminatoria : "1",
+          partidosEliminatoria:
+            standard && config.partidosEliminatoria
+              ? config.partidosEliminatoria
+              : "1",
           iniciadoEn: new Date().toISOString(),
         },
-        jornadas: [],
+        jornadas,
         sorteo: null,
         retirados: [],
         eliminatoria: null,
-        // Standard: grupos al azar; los equipos que sobran se reparten de a uno por grupo
-        grupos: standard ? generarGrupos(torneo.equipos.map((e) => e.nombreequipo), Number(config.equiposPorGrupo)) : [],
-      })
+        grupos,
+      });
     },
     [commit]
   )
@@ -507,8 +525,10 @@ export default function useTorneos() {
       if (pendientes > 0) return { ok: false, error: `Aún faltan ${pendientes} partidos por completar.` }
 
       return actualizarTorneo(torneo, {
-        jornadas: torneo.jornadas.map((j) => (j.id === jornadaId ? { ...j, estado: "finalizada" } : j)),
-      })
+        jornadas: torneo.jornadas.map((j) =>
+          j.id === jornadaId ? { ...j, estado: "finalizada" } : j,
+        ),
+      });
     },
     [commit]
   )
@@ -521,6 +541,7 @@ export default function useTorneos() {
       const jornada = torneo.jornadas.find((j) => j.partidos.some((p) => p.id === partidoId))
       const partido = jornada?.partidos.find((p) => p.id === partidoId)
       if (!partido) return { ok: false, error: "El partido ya no existe en el torneo." }
+      if (jornada.estado === "pendiente") return { ok: false, error: "Esa jornada aún no está activa." }
       if (jornada.estado !== "activa") return { ok: false, error: "La jornada de este partido ya fue finalizada." }
       if (partido.estado === "anulado") return { ok: false, error: "Este partido fue anulado (un equipo se retiró del torneo)." }
       if (partido.estado === "jugado") return { ok: false, error: "Este partido ya tiene un resultado registrado." }
@@ -531,13 +552,22 @@ export default function useTorneos() {
         registradoEn: new Date().toISOString(),
         forfeit: ["A", "B", "both"].includes(forfeit) ? forfeit : null, // inasistencia: "A" | "B" | "both"
       }
+      const jornadas = torneo.jornadas.map((j) =>
+        j.id !== jornada.id
+          ? j
+          : {
+              ...j,
+              partidos: j.partidos.map((p) =>
+                p.id === partidoId ? { ...p, estado: "jugado", resultado } : p,
+              ),
+            },
+      );
       return actualizarTorneo(torneo, {
-        jornadas: torneo.jornadas.map((j) =>
-          j.id !== jornada.id
-            ? j
-            : { ...j, partidos: j.partidos.map((p) => (p.id === partidoId ? { ...p, estado: "jugado", resultado } : p)) }
-        ),
-      })
+        jornadas:
+          torneo.config.generacionJornadas === "automatico"
+            ? finalizarCompletas(jornadas)
+            : jornadas,
+      });
     },
     [commit]
   )
@@ -560,9 +590,13 @@ export default function useTorneos() {
     async (nombreTorneo, equipo) => {
       const torneo = ref.current.find((t) => t.nombretorneo === nombreTorneo)
       if (!torneo) return { ok: false, error: "El torneo no existe." }
-      const r = crearRetiro(torneo, equipo)
-      if (!r.ok) return r
-      return actualizarTorneo(torneo, r.cambios)
+      const r = crearRetiro(torneo, equipo);
+      if (!r.ok) return r;
+      const cambios =
+        torneo.config.generacionJornadas === "automatico"
+          ? { ...r.cambios, jornadas: finalizarCompletas(r.cambios.jornadas) }
+          : r.cambios;
+      return actualizarTorneo(torneo, cambios);
     },
     [commit]
   )

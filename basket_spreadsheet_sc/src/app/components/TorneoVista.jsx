@@ -1,5 +1,4 @@
 "use client"
-import { useState } from "react"
 import Modal from "./Modal"
 import {
   TIPO_STANDARD,
@@ -15,6 +14,7 @@ import {
   calcularTabla,
   potenciaDe2,
   tamanosGrupos,
+  METODOS_JORNADAS, etiquetaMetodoJornadas, numeroJornadasCalendario
 } from "../utils/torneoLogic"
 import {
   etiquetaFase,
@@ -30,8 +30,11 @@ import {
   campeon,
   clasificacionFinal,
   hayEmpatesSinResolver,
+  paresPorJugar,
 } from "../utils/torneoEstandar"
-
+import { useState, useEffect } from "react"
+import { sharePlanillaFile, downloadFile } from "../utils/print_planilla"
+import { generateTablaPosicionesFile } from "../utils/pdfTablaPosiciones"
 const inputCls =
   "w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
 const btnPrimario =
@@ -61,7 +64,7 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
   const [error, setError] = useState("")
   const [confirmando, setConfirmando] = useState(false)
   const [guardando, setGuardando] = useState(false)
-
+  const [metodo, setMetodo] = useState("manual") // método de generación de jornadas
   const standard = tipo === TIPO_STANDARD
   const total = torneo.equipos.length
   const config = {
@@ -71,6 +74,7 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
     clasificadosPorGrupo: standard ? Number(clasificados) : null,
     juegoTercerPuesto: standard && tercer === "si",
     partidosEliminatoria: standard ? eliminatoria : null,
+    generacionJornadas: metodo,
   }
 
   // Vista previa de la configuración Standard
@@ -97,23 +101,53 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
   return (
     <div className="max-w-md">
       <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-        El torneo aún no ha iniciado. Configura el formato y pulsa «Comenzar torneo».
+        El torneo aún no ha iniciado. Configura el formato y pulsa «Comenzar
+        torneo».
       </p>
 
       <Campo label="Tipo de torneo">
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
-          <option value="" disabled>Seleccione…</option>
+        <select
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+          className={inputCls}
+        >
+          <option value="" disabled>
+            Seleccione…
+          </option>
           {TIPOS.map((t) => (
-            <option key={t.id} value={t.id}>{t.label}</option>
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
           ))}
         </select>
       </Campo>
 
       <Campo label="Cantidad de partidos entre equipos">
-        <select value={partidos} onChange={(e) => setPartidos(e.target.value)} className={inputCls}>
-          <option value="" disabled>Seleccione…</option>
+        <select
+          value={partidos}
+          onChange={(e) => setPartidos(e.target.value)}
+          className={inputCls}
+        >
+          <option value="" disabled>
+            Seleccione…
+          </option>
           {FORMATOS_PARTIDOS.map((f) => (
-            <option key={f.id} value={f.id}>{f.label}</option>
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo label="Método de generación de jornadas">
+        <select
+          value={metodo}
+          onChange={(e) => setMetodo(e.target.value)}
+          className={inputCls}
+        >
+          {METODOS_JORNADAS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
           ))}
         </select>
       </Campo>
@@ -121,41 +155,98 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
       {standard && (
         <>
           <Campo label="Equipos por grupo">
-            <input type="number" min={2} max={total} value={porGrupo} onChange={(e) => setPorGrupo(e.target.value)} className={inputCls} />
+            <input
+              type="number"
+              min={2}
+              max={total}
+              value={porGrupo}
+              onChange={(e) => setPorGrupo(e.target.value)}
+              className={inputCls}
+            />
           </Campo>
           <Campo label="Equipos clasificados por grupo">
-            <input type="number" min={1} value={clasificados} onChange={(e) => setClasificados(e.target.value)} className={inputCls} />
+            <input
+              type="number"
+              min={1}
+              max={Number.isInteger(p) && p >= 2 ? p : undefined}
+              value={clasificados}
+              onChange={(e) => setClasificados(e.target.value)}
+              className={inputCls}
+            />
           </Campo>
           <Campo label="Partidos por llave en la eliminatoria">
-            <select value={eliminatoria} onChange={(e) => setEliminatoria(e.target.value)} className={inputCls}>
+            <select
+              value={eliminatoria}
+              onChange={(e) => setEliminatoria(e.target.value)}
+              className={inputCls}
+            >
               {FORMATOS_ELIMINATORIA.map((f) => (
-                <option key={f.id} value={f.id}>{f.label}</option>
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
               ))}
             </select>
           </Campo>
           <Campo label="Juego por el tercer lugar">
-            <select value={tercer} onChange={(e) => setTercer(e.target.value)} className={inputCls}>
-              <option value="si">Sí (entre los perdedores de las semifinales)</option>
+            <select
+              value={tercer}
+              onChange={(e) => setTercer(e.target.value)}
+              className={inputCls}
+            >
+              <option value="si">
+                Sí (entre los perdedores de las semifinales)
+              </option>
               <option value="no">No</option>
             </select>
           </Campo>
 
           {tamanos && (
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              Se formarán {tamanos.length} {tamanos.length === 1 ? "grupo" : "grupos"} al azar ({tamanos.join(", ")} equipos);
-              los equipos que sobran se reparten de a uno por grupo.
-              {Number.isInteger(q) && q >= 1 && q < p && (
-                <> Clasificarán {tamanos.length * q} equipos a una llave de {potenciaDe2(tamanos.length * q)}.</>
+              Se formarán {tamanos.length}{" "}
+              {tamanos.length === 1 ? "grupo" : "grupos"} al azar (
+              {tamanos.join(", ")} equipos); los equipos que sobran se reparten
+              de a uno por grupo.
+              {Number.isInteger(q) && q >= 1 && q <= p && (
+                <>
+                  {" "}
+                  Clasificarán {tamanos.length * q} equipos a una llave de{" "}
+                  {potenciaDe2(tamanos.length * q)}.
+                </>
               )}
             </p>
           )}
         </>
       )}
 
-      {total < 2 && <p className="mt-3 text-sm text-red-600">Se necesitan al menos 2 equipos para comenzar el torneo.</p>}
+      {total < 2 && (
+        <p className="mt-3 text-sm text-red-600">
+          Se necesitan al menos 2 equipos para comenzar el torneo.
+        </p>
+      )}
+      {(() => {
+        const tamanosCal = standard ? tamanos : [total];
+        if (metodo !== "automatico" || !partidos || !tamanosCal) return null;
+        const n = numeroJornadasCalendario(tamanosCal, partidos);
+        return (
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Se generarán {n} {n === 1 ? "jornada" : "jornadas"} con todos los cruces de la fase de grupos, todas disponibles al mismo tiempo
+      
+            {partidos === "mejor3" &&
+              " (en mejor de 3, el tercer juego se genera solo si la serie queda 1-1)"}
+            .
+            {standard &&
+              " La fase eliminatoria siempre se genera de forma manual."}
+          </p>
+        );
+      })()}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <button type="button" onClick={pedirConfirmacion} disabled={!tipo || !partidos || total < 2} className={`${btnPrimario} mt-5`}>
+      <button
+        type="button"
+        onClick={pedirConfirmacion}
+        disabled={!tipo || !partidos || total < 2}
+        className={`${btnPrimario} mt-5`}
+      >
         Comenzar torneo
       </button>
 
@@ -166,8 +257,20 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
         onClose={() => !guardando && setConfirmando(false)}
         footer={
           <>
-            <button type="button" disabled={guardando} onClick={() => setConfirmando(false)} className={btnSecundario}>Cancelar</button>
-            <button type="button" disabled={guardando} onClick={comenzar} className={btnPrimario}>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => setConfirmando(false)}
+              className={btnSecundario}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={comenzar}
+              className={btnPrimario}
+            >
               {guardando ? "Creando…" : "Confirmar"}
             </button>
           </>
@@ -175,11 +278,13 @@ function ConfigurarTorneo({ torneo, onIniciar }) {
       >
         <p className="text-sm">
           Si comienzas el torneo <b>no podrás agregar más equipos</b>
-          {standard && " y los grupos se sortearán en ese momento"}. ¿Deseas continuar?
+          {standard && " y los grupos se sortearán en ese momento"}
+          {metodo === "automatico" && " y se generará todo el calendario de la fase de grupos"}. ¿Deseas
+          continuar?
         </p>
       </Modal>
     </div>
-  )
+  );
 }
 
 /* ───────────── Piezas del torneo iniciado ───────────── */
@@ -267,10 +372,13 @@ function TablaPosiciones({ filas, nota = true }) {
 }
 
 /* ───────────── Standard: grupos (un desplegable por grupo) ───────────── */
-function SeccionGrupos({ tablas }) {
+function SeccionGrupos({ tablas, acciones }) {
   return (
     <section className="mt-5">
-      <h3 className={tituloSeccion}>Fase de grupos</h3>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Fase de grupos</h3>
+        {acciones}
+      </div>
       <div className="space-y-2">
         {tablas.map((t) => (
           <details key={t.nombre} className="rounded-md border border-gray-200 dark:border-gray-800">
@@ -287,6 +395,54 @@ function SeccionGrupos({ tablas }) {
         ))}
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{NOTA_TABLA}</p>
+    </section>
+  )
+}
+
+/* ───────────── Calendario automático: todas las jornadas de la fase de grupos ───────────── */
+const ESTADO_JORNADA = {
+  activa: ["Activa", "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"],
+  pendiente: ["Pendiente", "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"],
+  finalizada: ["Finalizada", "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"],
+}
+
+function CalendarioJornadas({ jornadas, etiqueta, mejor3 }) {
+  const primeraAbierta = jornadas.find((j) => j.partidos.some((p) => p.estado === "programado"))?.id
+
+  return (
+    <section className="mt-5">
+      <h3 className={tituloSeccion}>
+        Calendario de la fase de grupos
+        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+          {jornadas.length} {jornadas.length === 1 ? "jornada" : "jornadas"}
+        </span>
+      </h3>
+      <div className="space-y-2">
+        {jornadas.map((j) => {
+          const [texto, cls] = ESTADO_JORNADA[j.estado] ?? ESTADO_JORNADA.pendiente
+          return (
+             <details key={j.id} open={j.id === primeraAbierta} className="rounded-md border border-gray-200 dark:border-gray-800">
+              <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                Jornada {j.numero}
+                <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                  {j.partidos.length} {j.partidos.length === 1 ? "partido" : "partidos"}
+                </span>
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${cls}`}>{texto}</span>
+              </summary>
+              <ul className="divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+                {j.partidos.map((p) => (
+                  <FilaPartido key={p.id} p={p} etiqueta={etiqueta(p)} />
+                ))}
+              </ul>
+            </details>
+          )
+        })}
+      </div>
+      {mejor3 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          En mejor de 3, el tercer juego solo se genera si la serie queda 1-1 al terminar el calendario.
+        </p>
+      )}
     </section>
   )
 }
@@ -491,58 +647,108 @@ function RetirarEquipoModal({ torneo, onClose, onRetirar }) {
 
 /* ───────────── Torneo iniciado ───────────── */
 function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJornada, onRealizarSorteo, onRetirarEquipo }) {
-  const { config } = torneo
-  const standard = config.tipo === TIPO_STANDARD
-  const activa = jornadaActiva(torneo)
-  const finalizado = torneoFinalizado(torneo)
-  const gruposListos = standard && faseGruposTerminada(torneo)
-  const max = maxPartidosPorJornada(torneo)
-  const pendientes = activa ? activa.partidos.filter((p) => p.estado === "programado").length : 0
-  const sorteoPendiente = hayEmpatesSinResolver(torneo)
+  const { config } = torneo;
+  const standard = config.tipo === TIPO_STANDARD;
+  const activa = jornadaActiva(torneo);
+  const finalizado = torneoFinalizado(torneo);
+  const gruposListos = standard && faseGruposTerminada(torneo);
+  const max = maxPartidosPorJornada(torneo);
+  const pendientes = activa
+    ? activa.partidos.filter((p) => p.estado === "programado").length
+    : 0;
+  const sorteoPendiente = hayEmpatesSinResolver(torneo);
 
   // Fase de grupos (o leaderboard) todavía puede programar jornadas
-  const enGrupos = !standard || (!torneo.eliminatoria && !gruposListos)
-  const puedeGenerarJornada = !activa && !finalizado && enGrupos
-  const puedeGenerarFase = standard && !activa && !finalizado && (gruposListos || !!torneo.eliminatoria)
+  const enGrupos = !standard || (!torneo.eliminatoria && !gruposListos);
+  const puedeGenerarFase =
+    standard &&
+    !activa &&
+    !finalizado &&
+    (gruposListos || !!torneo.eliminatoria);
 
-  const tabla = !standard ? calcularTabla(torneo) : []
-  const tablas = standard ? tablasGrupos(torneo) : []
-  const finalFilas = standard && finalizado ? clasificacionFinal(torneo) : []
-  const finalizadas = torneo.jornadas.filter((j) => j.estado === "finalizada").reverse()
-  const etiqueta = (p) => (standard ? etiquetaPartido(torneo, p) : null)
+  const tabla = !standard ? calcularTabla(torneo) : [];
+  const tablas = standard ? tablasGrupos(torneo) : [];
+  const finalFilas = standard && finalizado ? clasificacionFinal(torneo) : [];
+  const etiqueta = (p) => (standard ? etiquetaPartido(torneo, p) : null);
+  const automatico = config.generacionJornadas === "automatico";
+  const calendarioActivo = automatico && activa?.fase === "grupos"; // hay jornadas de grupos abiertas
 
-  const [cantidad, setCantidad] = useState("")
-  const [error, setError] = useState("")
-  const [procesando, setProcesando] = useState(false)
-  const [retirando, setRetirando] = useState(false)
-  const hayRetirables = equiposRetirables(torneo).length > 0
+  const puedeGenerarJornada =
+    !activa &&
+    !finalizado &&
+    enGrupos &&
+    (!automatico || paresPorJugar(torneo).length > 0); // automático: solo juegos de desempate
 
+  const calendario = automatico
+    ? torneo.jornadas.filter((j) => j.fase === "grupos")
+    : [];
+  const finalizadas = torneo.jornadas
+    .filter(
+      (j) => j.estado === "finalizada" && !(automatico && j.fase === "grupos"),
+    ) // las de grupos ya están en el calendario
+    .reverse();
+  const [cantidad, setCantidad] = useState("");
+  const [error, setError] = useState("");
+  const [procesando, setProcesando] = useState(false);
+  const [retirando, setRetirando] = useState(false);
+  const hayRetirables = equiposRetirables(torneo).length > 0;
+  // Secciones del PDF: leaderboard = una tabla; standard = clasificación final (si ya hay) + una tabla por grupo
+  const seccionesPdf = standard
+    ? [
+        ...(finalFilas.length > 0
+          ? [
+              {
+                tipo: "final",
+                titulo: "Clasificación final",
+                filas: finalFilas,
+              },
+            ]
+          : []),
+        ...tablas.map((t) => ({ titulo: `Grupo ${t.nombre}`, filas: t.filas })),
+      ]
+    : [{ filas: tabla }];
   const ejecutar = async (accion) => {
-    setProcesando(true)
-    const res = await accion()
-    setProcesando(false)
-    if (!res.ok) return setError(res.error)
-    setError("")
-    setCantidad("")
-  }
+    setProcesando(true);
+    const res = await accion();
+    setProcesando(false);
+    if (!res.ok) return setError(res.error);
+    setError("");
+    setCantidad("");
+  };
 
-  const fecha = config.iniciadoEn ? new Date(config.iniciadoEn) : null
+  const fecha = config.iniciadoEn ? new Date(config.iniciadoEn) : null;
   const resumen = [
     ["Tipo", etiquetaTipo(config.tipo)],
     ["Partidos entre equipos", etiquetaFormato(config.partidosEntreEquipos)],
+    [
+      "Generación de jornadas",
+      etiquetaMetodoJornadas(config.generacionJornadas),
+    ],
     ...(standard
       ? [
           ["Equipos por grupo", config.equiposPorGrupo],
           ["Clasificados por grupo", config.clasificadosPorGrupo],
-          ["Eliminatoria", etiquetaFormatoEliminatoria(config.partidosEliminatoria ?? "1")],
+          [
+            "Eliminatoria",
+            etiquetaFormatoEliminatoria(config.partidosEliminatoria ?? "1"),
+          ],
           ["Tercer puesto", config.juegoTercerPuesto ? "Sí" : "No"],
         ]
       : []),
     ...((torneo.retirados ?? []).length > 0
-      ? [["Retirados", torneo.retirados.map((r) => `${r.equipo} (${etiquetaFase(r.fase)})`).join(", ")]]
+      ? [
+          [
+            "Retirados",
+            torneo.retirados
+              .map((r) => `${r.equipo} (${etiquetaFase(r.fase)})`)
+              .join(", "),
+          ],
+        ]
       : []),
-    ...(fecha && !Number.isNaN(fecha.getTime()) ? [["Inicio", fecha.toLocaleDateString("es")]] : []),
-  ]
+    ...(fecha && !Number.isNaN(fecha.getTime())
+      ? [["Inicio", fecha.toLocaleDateString("es")]]
+      : []),
+  ];
 
   return (
     <div>
@@ -566,29 +772,35 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
         <h3 className={tituloSeccion}>Gestion de Jornadas</h3>
 
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            Partidos de la jornada
-            <input
-              type="number"
-              min={1}
-              max={max}
-              value={cantidad}
-              onChange={(e) => setCantidad(e.target.value)}
-              placeholder={`Máx. ${max} ${max === 1 ? "partido" : "partidos"}`}
-              disabled={!puedeGenerarJornada || procesando}
-              className={`${inputCls} mt-1 w-40`}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              ejecutar(() => onGenerarJornada(torneo.nombretorneo, cantidad))
-            }
-            disabled={!puedeGenerarJornada || procesando || !cantidad}
-            className={btnPrimario}
-          >
-            Generar jornada
-          </button>
+          {!automatico && (
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              Partidos de la jornada
+              <input
+                type="number"
+                min={1}
+                max={max}
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value)}
+                placeholder={`Máx. ${max} ${max === 1 ? "partido" : "partidos"}`}
+                disabled={!puedeGenerarJornada || procesando}
+                className={`${inputCls} mt-1 w-40`}
+              />
+            </label>
+          )}
+          {(!automatico || config.partidosEntreEquipos === "mejor3") && (
+            <button
+              type="button"
+              onClick={() =>
+                ejecutar(() => onGenerarJornada(torneo.nombretorneo, cantidad))
+              }
+              disabled={
+                !puedeGenerarJornada || procesando || (!automatico && !cantidad)
+              }
+              className={btnPrimario}
+            >
+              {automatico ? "Generar juegos de desempate" : "Generar jornada"}
+            </button>
+          )}
           {standard && (
             <button
               type="button"
@@ -599,18 +811,22 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
               {etiquetaSiguientePaso(torneo)}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() =>
-              ejecutar(() => onFinalizarJornada(torneo.nombretorneo, activa.id))
-            }
-            disabled={!activa || pendientes > 0 || procesando}
-            className={
-              btnSecundario + " border border-gray-300 dark:border-gray-700"
-            }
-          >
-            Finalizar jornada
-          </button>
+          {!calendarioActivo && (
+            <button
+              type="button"
+              onClick={() =>
+                ejecutar(() =>
+                  onFinalizarJornada(torneo.nombretorneo, activa.id),
+                )
+              }
+              disabled={!activa || pendientes > 0 || procesando}
+              className={
+                btnSecundario + " border border-gray-300 dark:border-gray-700"
+              }
+            >
+              Finalizar jornada
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setRetirando(true)}
@@ -621,7 +837,7 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
           </button>
         </div>
 
-        {activa && pendientes > 0 && (
+        {activa && !calendarioActivo && pendientes > 0 && (
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Para finalizar la jornada faltan {pendientes}{" "}
             {pendientes === 1 ? "partido" : "partidos"} por completar.
@@ -679,7 +895,7 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
         </div>
       )}
 
-      {activa && (
+      {activa && !calendarioActivo && (
         <section className="mt-5">
           <h3 className={tituloSeccion}>
             Jornada {activa.numero} (activa)
@@ -692,6 +908,13 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
           </ul>
         </section>
       )}
+      {calendario.length > 0 && (
+        <CalendarioJornadas
+          jornadas={calendario}
+          etiqueta={etiqueta}
+          mejor3={config.partidosEntreEquipos === "mejor3"}
+        />
+      )}
 
       {standard && finalFilas.length > 0 && (
         <ClasificacionFinal filas={finalFilas} />
@@ -699,12 +922,22 @@ function TorneoIniciado({ torneo, onGenerarJornada, onGenerarFase, onFinalizarJo
 
       {standard ? (
         <>
-          <SeccionGrupos tablas={tablas} />
+          <SeccionGrupos
+            tablas={tablas}
+            acciones={
+              <BotonCompartirTabla torneo={torneo} secciones={seccionesPdf} />
+            }
+          />
           <SeccionLlaves torneo={torneo} />
         </>
       ) : (
         <section className="mt-5">
-          <h3 className={tituloSeccion}>Tabla de posiciones</h3>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              Tabla de posiciones
+            </h3>
+            <BotonCompartirTabla torneo={torneo} secciones={seccionesPdf} />
+          </div>
           <TablaPosiciones filas={tabla} />
         </section>
       )}
@@ -751,5 +984,35 @@ export default function VistaTorneo({ torneo, onIniciar, onGenerarJornada, onGen
     />
   ) : (
     <ConfigurarTorneo torneo={torneo} onIniciar={onIniciar} />
+  )
+}
+
+function BotonCompartirTabla({ torneo, secciones }) {
+  const [archivo, setArchivo] = useState(null)
+  const [error, setError] = useState("")
+
+  // El PDF se regenera solo cuando cambian los datos reales
+  const firma = JSON.stringify(secciones)
+
+  useEffect(() => {
+    let cancelado = false
+    setArchivo(null)
+    setError("")
+    generateTablaPosicionesFile(torneo, secciones, NOTA_TABLA)
+      .then((file) => { if (!cancelado) setArchivo(file) })
+      .catch(() => { if (!cancelado) setError("No se pudo generar el PDF.") })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firma, torneo.nombretorneo])
+
+  const compartir = () => sharePlanillaFile(archivo, `Tabla de posiciones · ${torneo.nombretorneo}`)
+
+  return (
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-red-600">{error}</span>}
+      <button type="button" onClick={compartir} disabled={!archivo} className={btnPrimario}>
+        {archivo || error ? "Compartir tabla" : "Preparando PDF…"}
+      </button>
+    </div>
   )
 }

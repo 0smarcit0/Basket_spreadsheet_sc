@@ -13,6 +13,17 @@ export const FORMATOS_PARTIDOS = [
   { id: "2", label: "2 partidos" },
   { id: "mejor3", label: "Mejor de 3" },
 ]
+export const METODOS_JORNADAS = [
+  { id: "manual", label: "Manual (genero cada jornada)" },
+  { id: "automatico", label: "Automático (todo el calendario de grupos al iniciar)" },
+]
+export const etiquetaMetodoJornadas = (id) => METODOS_JORNADAS.find((m) => m.id === id)?.label ?? "Manual (genero cada jornada)"
+
+// Jornadas del calendario automático: rondas del grupo más grande × vueltas (mejor de 3 arranca con 2)
+export function numeroJornadasCalendario(tamanos, modo) {
+  const rondas = Math.max(0, ...tamanos.map((n) => (n % 2 === 0 ? n - 1 : n)))
+  return rondas * (modo === "1" ? 1 : 2)
+}
 
 // Partidos que deben jugar dos equipos en cada llave de la eliminatoria (Standard)
 export const FORMATOS_ELIMINATORIA = [
@@ -51,29 +62,44 @@ export function validarConfig(c, totalEquipos) {
   if (!FORMATOS_PARTIDOS.some((f) => f.id === c.partidosEntreEquipos)) {
     return "Selecciona la cantidad de partidos entre equipos."
   }
+  if (c.generacionJornadas != null && !METODOS_JORNADAS.some((m) => m.id === c.generacionJornadas)) {
+    return "Selecciona el método de generación de jornadas."
+  }
   if (c.tipo === TIPO_STANDARD) {
-    const p = Number(c.equiposPorGrupo)
-    const q = Number(c.clasificadosPorGrupo)
+    const p = Number(c.equiposPorGrupo);
+    const q = Number(c.clasificadosPorGrupo);
     if (!Number.isInteger(p) || p < 2 || p > totalEquipos) {
-      return `Los equipos por grupo deben ser un entero entre 2 y ${totalEquipos}.`
+      return `Los equipos por grupo deben ser un entero entre 2 y ${totalEquipos}.`;
     }
-    if (!Number.isInteger(q) || q < 1 || q >= p) {
-      return `Los clasificados por grupo deben ser un entero entre 1 y ${p - 1}.`
+    // q === p: clasifican todos los equipos del grupo
+    if (!Number.isInteger(q) || q < 1 || q > p) {
+      return `Los clasificados por grupo deben ser un entero entre 1 y ${p}.`;
     }
-    if (c.partidosEliminatoria != null && !FORMATOS_ELIMINATORIA.some((f) => f.id === c.partidosEliminatoria)) {
-      return "Selecciona la cantidad de partidos por llave en la eliminatoria."
+    if (
+      c.partidosEliminatoria != null &&
+      !FORMATOS_ELIMINATORIA.some((f) => f.id === c.partidosEliminatoria)
+    ) {
+      return "Selecciona la cantidad de partidos por llave en la eliminatoria.";
     }
-    const g = Math.floor(totalEquipos / p)
-    const clasificados = g * q
+    const g = Math.floor(totalEquipos / p);
+    const clasificados = g * q;
     if (clasificados < 2) {
-      return `Con ${g} ${g === 1 ? "grupo" : "grupos"} y ${q} clasificado(s) por grupo solo avanzaría ${clasificados} equipo; la eliminatoria necesita al menos 2.`
+      return `Con ${g} ${g === 1 ? "grupo" : "grupos"} y ${q} clasificado(s) por grupo solo avanzaría ${clasificados} equipo; la eliminatoria necesita al menos 2.`;
     }
-    const llave = potenciaDe2(clasificados)
+    const llave = potenciaDe2(clasificados);
     if (llave > MAX_LLAVE) {
-      return `La eliminatoria admite máximo ${MAX_LLAVE} equipos (dieciseisavos) y esta configuración clasifica ${clasificados}.`
+      return `La eliminatoria admite máximo ${MAX_LLAVE} equipos (dieciseisavos) y esta configuración clasifica ${clasificados}.`;
     }
-    if (llave - clasificados > g) {
-      return `Clasifican ${clasificados} equipos y la llave necesita ${llave}. Los ${llave - clasificados} lugares restantes se completan con los mejores ${q + 1}.º puestos de los grupos, pero solo hay ${g} ${g === 1 ? "grupo" : "grupos"}. Ajusta los equipos por grupo o los clasificados.`
+    // Los lugares que faltan se completan con el puesto q+1 de cada grupo; solo lo tienen
+    // los grupos con más de q equipos (si q === p, únicamente los que recibieron un sobrante).
+    const faltan = llave - clasificados;
+    const conRelleno = tamanosGrupos(totalEquipos, p).filter(
+      (t) => t > q,
+    ).length;
+    if (faltan > conRelleno) {
+      return q >= p && conRelleno === 0
+        ? `Clasifican ${clasificados} equipos y la llave necesita ${llave}. Si pasan todos los equipos del grupo, la cantidad debe ser potencia de 2 (2, 4, 8, 16, 32). Reduce los clasificados o cambia los equipos por grupo.`
+        : `Clasifican ${clasificados} equipos y la llave necesita ${llave}. Los ${faltan} lugares restantes se completan con los mejores ${q + 1}.º puestos de los grupos, pero solo ${conRelleno} ${conRelleno === 1 ? "grupo tiene" : "grupos tienen"} ese puesto. Ajusta los equipos por grupo o los clasificados.`;
     }
   }
   return null
@@ -88,6 +114,7 @@ export const equiposActivos = (torneo) => {
 }
 
 export const jornadaActiva = (torneo) => torneo.jornadas.find((j) => j.estado === "activa") ?? null
+export const jornadasActivas = (torneo) => torneo.jornadas.filter((j) => j.estado === "activa")
 export const maxPartidosPorJornada = (torneo) => {
   const ret = retiradosSet(torneo)
   return torneo.config?.tipo === TIPO_STANDARD && torneo.grupos?.length
@@ -142,6 +169,7 @@ function puedeJugarOtraVez(modo, h) {
   if (h.total === 2) return Object.keys(h.victorias).length === 2
   return false
 }
+
 
 export function paresDisponibles(nombres, jornadas, modo) {
   const h = historial(jornadas)

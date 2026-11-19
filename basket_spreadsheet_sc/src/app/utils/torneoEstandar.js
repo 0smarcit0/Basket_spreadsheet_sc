@@ -398,9 +398,113 @@ const crearJornadaObj = (torneo, fase, partidos, juego = 1) => {
   }
 }
 
+/* ───────────── Calendario automático de la fase de grupos ───────────── */
+// Método del círculo: rondas de un grupo (cada equipo juega una vez por ronda; con impares, uno descansa)
+function rondasRoundRobin(equipos) {
+  const lista = barajar(equipos)
+  if (lista.length % 2 === 1) lista.push(null)
+  const n = lista.length
+  const rondas = []
+  for (let r = 0; r < n - 1; r++) {
+    const pares = []
+    for (let i = 0; i < n / 2; i++) {
+      const a = lista[i]
+      const b = lista[n - 1 - i]
+      if (a === null || b === null) continue
+      pares.push((i + r) % 2 === 0 ? [a, b] : [b, a])
+    }
+    rondas.push(pares)
+    lista.splice(1, 0, lista.pop()) // rota todos menos el primero
+  }
+  return rondas
+}
+
+// Todas las jornadas de la fase de grupos. La 1.ª queda activa y el resto "pendiente".
+// "mejor3": solo 2 juegos por pareja; el 3.º se genera aparte (crearJornadasRestantes) si queda 1-1.
+export function calendarioAutomatico(grupos, modo) {
+  const vueltas = modo === "1" ? 1 : 2
+  const porGrupo = grupos.map((g) => rondasRoundRobin(g.equipos))
+  const numRondas = Math.max(0, ...porGrupo.map((r) => r.length))
+  const listas = []
+  for (let v = 0; v < vueltas; v++) {
+    for (let r = 0; r < numRondas; r++) {
+      const partidos = porGrupo.flatMap((rondas) =>
+        (rondas[r] ?? []).map(([a, b]) => (v % 2 === 0 ? [a, b] : [b, a])) // la vuelta invierte la localía
+      )
+      if (partidos.length > 0) listas.push(partidos)
+    }
+  }
+  return listas.map((partidos, i) => ({
+    id: nuevoId(),
+    numero: i + 1,
+    fase: FASE_GRUPOS,
+    juego: 1,
+    estado: "activa", // todas disponibles desde el inicio
+    creadaEn: new Date().toISOString(),
+    partidos: partidos.map(([equipoA, equipoB]) => ({
+      id: nuevoId(), fase: FASE_GRUPOS, llave: null, juego: 1, equipoA, equipoB, estado: "programado", resultado: null,
+    })),
+  }))
+}
+
+// Modo automático: finaliza las jornadas de grupos sin partidos por jugar
+export function finalizarCompletas(jornadas) {
+  return jornadas.map((j) =>
+    j.estado === "activa" && j.fase === FASE_GRUPOS && !j.partidos.some((p) => p.estado === "programado")
+      ? { ...j, estado: "finalizada" }
+      : j
+  )
+}
+
+// Parejas de la fase de grupos que todavía deben (y pueden) jugar
+export function paresPorJugar(torneo) {
+  if (!torneo.config) return []
+  if (torneo.config.tipo === TIPO_STANDARD) return paresDisponiblesGrupos(torneo)
+  return paresDisponibles(equiposActivos(torneo), torneo.jornadas, torneo.config.partidosEntreEquipos)
+}
+
+// Modo automático: tras jugar el calendario, genera lo que falte (el 3.er juego de las series 1-1)
+export function crearJornadasRestantes(torneo) {
+  if (!torneo.config) return { ok: false, error: "El torneo aún no ha iniciado." }
+  const standard = torneo.config.tipo === TIPO_STANDARD
+  if (torneo.jornadas.some((j) => j.estado === "activa" || j.estado === "pendiente")) {
+    return { ok: false, error: "Finaliza todas las jornadas del calendario antes de generar juegos de desempate." }
+  }
+  if (standard && torneo.eliminatoria) return { ok: false, error: "La fase de grupos ya terminó." }
+
+  let restantes = paresPorJugar(torneo)
+  if (restantes.length === 0) {
+    return {
+      ok: false,
+      error: standard
+        ? "La fase de grupos ya terminó: genera la fase eliminatoria."
+        : "Ya no quedan emparejamientos disponibles: todos los equipos jugaron entre sí.",
+    }
+  }
+
+  const clave = (a, b) => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`)
+  const acumuladas = [...torneo.jornadas]
+  let nuevas = 0
+  while (restantes.length > 0) {
+    const sel = emparejarPares(restantes, acumuladas, restantes.length) // un equipo juega una vez por jornada
+    if (sel.length === 0) break
+    const hechos = new Set(sel.map(([a, b]) => clave(a, b)))
+    restantes = restantes.filter(([a, b]) => !hechos.has(clave(a, b)))
+    const jornada = crearJornadaObj(
+      { jornadas: acumuladas },
+      FASE_GRUPOS,
+      sel.map(([equipoA, equipoB]) => ({ equipoA, equipoB })),
+    );
+    acumuladas.push(jornada)
+    nuevas++
+  }
+  return { ok: false, error: "Juega todos los partidos del calendario antes de generar juegos de desempate." }
+}
+
 // Jornada de la fase de grupos (Standard: parejas dentro de cada grupo; Leaderboard: todas)
 export function crearJornada(torneo, cantidad) {
   if (!torneo.config) return { ok: false, error: "El torneo aún no ha iniciado." }
+  if (torneo.config.generacionJornadas === "automatico") return crearJornadasRestantes(torneo)
   const standard = torneo.config.tipo === TIPO_STANDARD
   if (torneo.jornadas.some((j) => j.estado === "activa")) {
     return { ok: false, error: "Finaliza la jornada activa antes de generar otra." }

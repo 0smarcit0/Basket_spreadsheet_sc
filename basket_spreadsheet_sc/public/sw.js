@@ -2,7 +2,7 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const VERSION = "v5"; // súbelo (v2, v3...) para invalidar todos los caches
+const VERSION = "v6"; // súbelo (v2, v3...) para invalidar todos los caches
 
 const PRECACHE_ROUTES = [
   "/",

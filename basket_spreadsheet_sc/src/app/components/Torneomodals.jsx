@@ -3,7 +3,7 @@ import { useState } from "react"
 import { ChevronRight, Plus, Trash2, X, Pencil, Check } from "lucide-react"
 import Modal from "./Modal"
 import VistaTorneo from "./TorneoVista"
-import { jornadaActiva } from "../utils/torneoLogic"
+import { jornadasActivas } from "../utils/torneoLogic"
 import { etiquetaFase, etiquetaPartido } from "../utils/torneoEstandar"
 import {
   equipoVacio,
@@ -409,11 +409,15 @@ export function DetalleTorneoModal({
   const equipo = torneo.equipos.find((e) => e.nombreequipo === equipoSel)
   const iniciado = !!torneo.config
 
+  const [eliminando, setEliminando] = useState(false)
+
   const confirmarBorrado = async () => {
-    const res = await onRemoveTorneo(torneo.nombretorneo)
-    if (!res.ok) setErrorBorrado(res.error)
-    setBorrando(false)
-  }
+    setEliminando(true);
+    const res = await onRemoveTorneo(torneo.nombretorneo);
+    setEliminando(false);
+    setBorrando(false);
+    if (!res.ok) setErrorBorrado(res.error);
+  };
 
   return (
     <>
@@ -457,9 +461,10 @@ export function DetalleTorneoModal({
               onDelete={() => {
                 setErrorBorrado("");
                 setBorrando(true);
-            }}
-            error={errorBorrado}
-          />)}
+              }}
+              error={errorBorrado}
+            />
+          )}
         </div>
 
         {vista === "torneo" ? (
@@ -546,8 +551,173 @@ export function DetalleTorneoModal({
           onSave={(nuevo) => onAddEquipo(torneo.nombretorneo, nuevo)}
         />
       )}
+      <Modal
+        open={borrando}
+        title="Eliminar torneo"
+        size="sm"
+        onClose={() => !eliminando && setBorrando(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              disabled={eliminando}
+              onClick={() => setBorrando(false)}
+              className={btnSecundario}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={eliminando}
+              onClick={confirmarBorrado}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {eliminando ? "Eliminando…" : "Eliminar"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Se eliminará el torneo «{torneo.nombretorneo}» con todos sus equipos y
+          resultados. Esta acción no se puede deshacer. ¿Deseas continuar?
+        </p>
+      </Modal>
     </>
   );
+}
+/* ───────────── Confirmar jugadores de ambos equipos ───────────── */
+// onConfirm({ A: [jugadores], B: [jugadores] }) | onCancel()
+function ConfirmarJugadoresModal({ equipoA, equipoB, onCancel, onConfirm }) {
+  const [lado, setLado] = useState("A") // equipo visible en el toggle
+  const [seleccion, setSeleccion] = useState({ A: [], B: [] }) // índices del roster
+  const [confirmando, setConfirmando] = useState(false)
+
+  const equipos = { A: equipoA, B: equipoB }
+  const equipo = equipos[lado]
+  const elegidos = seleccion[lado]
+
+  const alternar = (i) =>
+    setSeleccion((prev) => {
+      const actual = prev[lado]
+      if (actual.includes(i)) return { ...prev, [lado]: actual.filter((x) => x !== i) }
+      if (actual.length >= 12) return prev // no caben más en la planilla
+      return { ...prev, [lado]: [...actual, i] }
+    })
+
+  // Cada equipo necesita al menos un jugador (salvo que su roster esté vacío)
+  const completo = ["A", "B"].every(
+    (l) => seleccion[l].length > 0 || equipos[l].roster.length === 0,
+  )
+
+  const finalizar = () => {
+    const jugadores = (l) => equipos[l].roster.filter((_, i) => seleccion[l].includes(i))
+    onConfirm({ A: jugadores("A"), B: jugadores("B") })
+  }
+
+  return (
+    <>
+      <Modal
+        open
+        title={`Confirmar jugadores ${equipo.nombreequipo}`}
+        size="md"
+        showCloseButton={false}
+        closeOnEsc={false}
+        closeOnOverlay={false}
+        footer={
+          <>
+            <button type="button" onClick={onCancel} className={btnSecundario}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!completo}
+              onClick={() => setConfirmando(true)}
+              className={btnPrimario}
+            >
+              Confirmar
+            </button>
+          </>
+        }
+      >
+        {/* Toggle entre equipos */}
+        <div className="mb-4 inline-flex w-full rounded-lg bg-gray-200 p-1 dark:bg-gray-800" role="tablist">
+          {["A", "B"].map((l) => (
+            <button
+              key={l}
+              type="button"
+              role="tab"
+              aria-selected={lado === l}
+              onClick={() => setLado(l)}
+              className={`flex-1 truncate rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                lado === l
+                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-600 dark:text-white"
+                  : "text-gray-600 hover:text-gray-800 dark:text-gray-300"
+              }`}
+            >
+              {equipos[l].nombreequipo} ({seleccion[l].length})
+            </button>
+          ))}
+        </div>
+
+        <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+          Toca los jugadores que participan en el partido ({elegidos.length}/{12}).
+          El cuerpo técnico se carga automáticamente.
+        </p>
+
+        {equipo.roster.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Este equipo no tiene jugadores registrados.</p>
+        ) : (
+          <ul className="space-y-2">
+            {equipo.roster.map((j, i) => {
+              const activo = elegidos.includes(i)
+              return (
+                <li key={i}>
+                  <button
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => alternar(i)}
+                    className={`flex w-full items-center gap-3 rounded-md border-2 px-3 py-2 text-left text-sm transition-colors ${
+                      activo
+                        ? "border-blue-600 bg-blue-50 dark:bg-gray-800"
+                        : "border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <span className="w-8 text-center font-bold">{j.dorsal}</span>
+                    <span className="flex-1">{j.nombre}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Modal>
+
+      {/* Submodal de confirmación */}
+      <Modal
+        open={confirmando}
+        title="Confirmar jugadores"
+        size="sm"
+        onClose={() => setConfirmando(false)}
+        footer={
+          <>
+            <button type="button" onClick={() => setConfirmando(false)} className={btnSecundario}>
+              Volver
+            </button>
+            <button type="button" onClick={finalizar} className={btnPrimario}>
+              Confirmar
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Se cargarán {seleccion.A.length} {seleccion.A.length === 1 ? "jugador" : "jugadores"} de{" "}
+          <b>{equipoA.nombreequipo}</b> y {seleccion.B.length}{" "}
+          {seleccion.B.length === 1 ? "jugador" : "jugadores"} de <b>{equipoB.nombreequipo}</b> en la planilla.
+          ¿Deseas continuar?
+        </p>
+      </Modal>
+    </>
+  )
 }
 
 /* ───────────── Planilla nueva: elegir torneo y partido/equipos ───────────── */
@@ -569,9 +739,19 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
   const torneo = torneos.find((t) => t.nombretorneo === opcion)
   const iniciado = !!torneo?.config
   const standard = torneo?.config?.tipo === "standard"
-  const jornada = torneo && iniciado ? jornadaActiva(torneo) : null
-  const partido = jornada?.partidos.find((p) => p.id === partidoId && p.estado === "programado")
-  const hayProgramados = !!jornada?.partidos.some((p) => p.estado === "programado")
+  const jornadas = torneo && iniciado ? jornadasActivas(torneo) : [];
+  // jornada del partido elegido
+  const jornada =
+    jornadas.find((j) =>
+      j.partidos.some((p) => p.id === partidoId && p.estado === "programado"),
+    ) ?? null;
+  const partido = jornada?.partidos.find((p) => p.id === partidoId);
+  const hayProgramados = jornadas.some((j) =>
+    j.partidos.some((p) => p.estado === "programado"),
+  );
+  const primeraAbierta = jornadas.find((j) =>
+    j.partidos.some((p) => p.estado === "programado"),
+  )?.id;
   const [textoPersonalizado, setTextoPersonalizado] = useState("")
   const nombreEqA = iniciado ? partido?.equipoA : nombreA
   const nombreEqB = iniciado ? partido?.equipoB : nombreB
@@ -581,6 +761,7 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
   const mismoEquipo = !iniciado && !!nombreA && nombreA === nombreB
   const pocosEquipos = !!torneo && !iniciado && torneo.equipos.length < 2
   const excedidos = [equipoA, equipoB].filter((e) => e && e.roster.length > MAX_JUGADORES_PLANILLA)
+  const [pendiente, setPendiente] = useState(null)
 
   const puedeContinuar =
   opcion === SIN_TORNEO ||
@@ -597,8 +778,6 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
 
 
  const continuar = () => {
-   // Partido libre: sin torneo vinculado (torneo: null, partido: null),
-   // solo cambia el texto que se muestra en el encabezado.
    if (opcion === SIN_TORNEO || opcion === PERSONALIZADO) {
      return onConfirm({
        torneo: null,
@@ -608,14 +787,14 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
        partido: null,
      });
    }
-   onConfirm({
+   // Torneo real: primero se confirman los jugadores
+   setPendiente({
      torneo,
      equipoA,
      equipoB,
      partido: iniciado ? { id: partido.id, jornadaId: jornada.id } : null,
    });
  };
-
   const selectEquipo = (label, value, onChange) => (
     <label className="mt-3 block text-sm font-medium text-gray-700 dark:text-gray-200">
       {label}
@@ -629,195 +808,230 @@ export function IniciarPlanillaModal({ torneos, loaded, onConfirm }) {
   )
 
   return (
-    <Modal
-      open
-      title="Nueva planilla"
-      size="md"
-      showCloseButton={false}
-      closeOnEsc={false}
-      closeOnOverlay={false}
-      footer={
-        <div className="flex-col flex gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <button
-            type="button"
-            disabled={!puedeContinuar}
-            onClick={continuar}
-            className={btnPrimario}
+    <>
+      <Modal
+        open
+        title="Nueva planilla"
+        size="md"
+        showCloseButton={false}
+        closeOnEsc={false}
+        closeOnOverlay={false}
+        footer={
+          <div className="flex-col flex gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              disabled={!puedeContinuar}
+              onClick={continuar}
+              className={btnPrimario}
+            >
+              Continuar
+            </button>
+            <Link href="/" className={btnSecundario}>
+              Regresar a inicio
+            </Link>
+          </div>
+        }
+      >
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Torneo
+          <select
+            value={opcion}
+            onChange={(e) => elegirOpcion(e.target.value)}
+            className={`${inputCls} mt-1 py-2`}
           >
-            Continuar
-          </button>
-          <Link href="/" className={btnSecundario}>
-            Regresar a inicio
-          </Link>
-        </div>
-      }
-    >
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-        Torneo
-        <select
-          value={opcion}
-          onChange={(e) => elegirOpcion(e.target.value)}
-          className={`${inputCls} mt-1 py-2`}
-        >
-          <option value="" disabled>
-            {loaded ? "Seleccione una opción" : "Cargando torneos…"}
-          </option>
+            <option value="" disabled>
+              {loaded ? "Seleccione una opción" : "Cargando torneos…"}
+            </option>
 
-          <optgroup label="Partido libre">
-            <option value={SIN_TORNEO}>Continuar sin torneo</option>
-            <option value={PERSONALIZADO}>Personalizado…</option>
-          </optgroup>
-          {torneos.length > 0 && (
-            <optgroup label="Torneos">
-              {torneos.map((t) => (
-                <option key={t.nombretorneo} value={t.nombretorneo}>
-                  {t.nombretorneo}
-                </option>
-              ))}
+            <optgroup label="Partido libre">
+              <option value={SIN_TORNEO}>Continuar sin torneo</option>
+              <option value={PERSONALIZADO}>Personalizado…</option>
             </optgroup>
-          )}
-        </select>
-      </label>
-      {opcion === PERSONALIZADO && (
-        <div className="mt-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Texto para el encabezado
-            <input
-              type="text"
-              autoFocus
-              maxLength={60}
-              value={textoPersonalizado}
-              onChange={(e) => setTextoPersonalizado(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && puedeContinuar) continuar();
-              }}
-              className={`${inputCls} mt-1 py-2`}
-            />
-          </label>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Se jugará como partido libre: no queda vinculado a ningún torneo.
-          </p>
-        </div>
-      )}
-
-      {loaded && torneos.length === 0 && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          No hay torneos registrados todavía.
-        </p>
-      )}
-
-      {/* Torneo sin iniciar: equipos a mano */}
-      {torneo && !iniciado && !pocosEquipos && (
-        <>
-          {selectEquipo("Equipo A", nombreA, setNombreA)}
-          {selectEquipo("Equipo B", nombreB, setNombreB)}
-        </>
-      )}
-
-      {/* Torneo iniciado: partidos de la jornada activa */}
-      {torneo && iniciado && !jornada && (
-        <p className="mt-3 text-sm text-red-600">
-          Este torneo no tiene una jornada activa. Genera una desde la sección
-          Torneos.
-        </p>
-      )}
-      {jornada && (
-        <fieldset className="mt-3">
-          <legend className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Jornada {jornada.numero} (activa)
-            {standard ? ` · ${etiquetaFase(jornada.fase)}` : ""}: selecciona un
-            partido
-          </legend>
-          <ul className="space-y-1">
-            {jornada.partidos.map((p) => {
-              const jugado = p.estado !== "programado"; // jugado o anulado
-              return (
-                <li key={p.id}>
-                  <label
-                    className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm ${
-                      jugado
-                        ? "opacity-50"
-                        : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="partido-jornada"
-                      disabled={jugado}
-                      checked={partidoId === p.id}
-                      onChange={() => setPartidoId(p.id)}
-                      className="accent-blue-600"
-                    />
-                    <span className="flex-1">
-                      {standard && (
-                        <span className="mr-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                          {etiquetaPartido(torneo, p)}
-                        </span>
-                      )}
-                      {p.equipoA} vs {p.equipoB}
-                    </span>
-                    {p.estado === "jugado" && (
-                      <span className="text-xs">
-                        Jugado {p.resultado.puntosA}-{p.resultado.puntosB}
-                      </span>
-                    )}
-                    {p.estado === "anulado" && (
-                      <span className="text-xs">Anulado (retiro)</span>
-                    )}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          {!hayProgramados && (
-            <p className="mt-2 text-sm text-amber-600">
-              Todos los partidos de esta jornada ya se jugaron. Finalízala desde
-              la sección Torneos.
+            {torneos.length > 0 && (
+              <optgroup label="Torneos">
+                {torneos.map((t) => (
+                  <option key={t.nombretorneo} value={t.nombretorneo}>
+                    {t.nombretorneo}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </label>
+        {opcion === PERSONALIZADO && (
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              Texto para el encabezado
+              <input
+                type="text"
+                autoFocus
+                maxLength={60}
+                value={textoPersonalizado}
+                onChange={(e) => setTextoPersonalizado(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && puedeContinuar) continuar();
+                }}
+                className={`${inputCls} mt-1 py-2`}
+              />
+            </label>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Se jugará como partido libre: no queda vinculado a ningún torneo.
             </p>
-          )}
-        </fieldset>
-      )}
+          </div>
+        )}
 
-      {pocosEquipos && (
-        <p className="mt-3 text-sm text-red-600">
-          Este torneo necesita al menos 2 equipos registrados.
-        </p>
+        {loaded && torneos.length === 0 && (
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            No hay torneos registrados todavía.
+          </p>
+        )}
+
+        {/* Torneo sin iniciar: equipos a mano */}
+        {torneo && !iniciado && !pocosEquipos && (
+          <>
+            {selectEquipo("Equipo A", nombreA, setNombreA)}
+            {selectEquipo("Equipo B", nombreB, setNombreB)}
+          </>
+        )}
+
+        {/* Torneo iniciado: partidos de la jornada activa */}
+        {torneo && iniciado && jornadas.length === 0 && (
+          <p className="mt-3 text-sm text-red-600">
+            Este torneo no tiene jornadas activas. Genera una desde la sección
+            Torneos.
+          </p>
+        )}
+        {jornadas.length > 0 && (
+          <fieldset className="mt-3">
+            <legend className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Selecciona un partido
+            </legend>
+            <div className="space-y-2">
+              {jornadas.map((j) => (
+                <details
+                  key={j.id}
+                  open={j.id === primeraAbierta}
+                  className="rounded-md border border-gray-200 dark:border-gray-800"
+                >
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                    Jornada {j.numero}
+                    {standard ? ` · ${etiquetaFase(j.fase)}` : ""}
+                    <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                      {
+                        j.partidos.filter((p) => p.estado === "programado")
+                          .length
+                      }{" "}
+                      por jugar
+                    </span>
+                  </summary>
+                  <ul className="space-y-1 border-t border-gray-200 p-2 dark:border-gray-800">
+                    {j.partidos.map((p) => {
+                      const jugado = p.estado !== "programado";
+                      return (
+                        <li key={p.id}>
+                          <label
+                            className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm ${
+                              jugado
+                                ? "opacity-50"
+                                : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="partido-jornada"
+                              disabled={jugado}
+                              checked={partidoId === p.id}
+                              onChange={() => setPartidoId(p.id)}
+                              className="accent-blue-600"
+                            />
+                            <span className="flex-1">
+                              {standard && (
+                                <span className="mr-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                  {etiquetaPartido(torneo, p)}
+                                </span>
+                              )}
+                              {p.equipoA} vs {p.equipoB}
+                            </span>
+                            {p.estado === "jugado" && (
+                              <span className="text-xs">
+                                Jugado {p.resultado.puntosA}-
+                                {p.resultado.puntosB}
+                              </span>
+                            )}
+                            {p.estado === "anulado" && (
+                              <span className="text-xs">Anulado (retiro)</span>
+                            )}
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ))}
+            </div>
+            {!hayProgramados && (
+              <p className="mt-2 text-sm text-amber-600">
+                Todos los partidos disponibles ya se jugaron. Finalízalos desde
+                la sección Torneos.
+              </p>
+            )}
+          </fieldset>
+        )}
+
+        {pocosEquipos && (
+          <p className="mt-3 text-sm text-red-600">
+            Este torneo necesita al menos 2 equipos registrados.
+          </p>
+        )}
+        {mismoEquipo && (
+          <p className="mt-3 text-sm text-red-600">
+            No puedes seleccionar el mismo equipo para A y B.
+          </p>
+        )}
+        {excedidos.map((e) => (
+          <p key={e.nombreequipo} className="mt-3 text-sm text-amber-600">
+            {e.nombreequipo} tiene {e.roster.length} jugadores y en la planilla
+            caben {MAX_JUGADORES_PLANILLA}: se cargarán los primeros{" "}
+            {MAX_JUGADORES_PLANILLA}.
+          </p>
+        ))}
+      </Modal>
+      {pendiente && (
+        <ConfirmarJugadoresModal
+          equipoA={pendiente.equipoA}
+          equipoB={pendiente.equipoB}
+          onCancel={() => setPendiente(null)}
+          onConfirm={(jugadores) =>
+            onConfirm({
+              ...pendiente,
+              jugadoresA: jugadores.A,
+              jugadoresB: jugadores.B,
+            })
+          }
+        />
       )}
-      {mismoEquipo && (
-        <p className="mt-3 text-sm text-red-600">
-          No puedes seleccionar el mismo equipo para A y B.
-        </p>
-      )}
-      {excedidos.map((e) => (
-        <p key={e.nombreequipo} className="mt-3 text-sm text-amber-600">
-          {e.nombreequipo} tiene {e.roster.length} jugadores y en la planilla
-          caben {MAX_JUGADORES_PLANILLA}: se cargarán los primeros{" "}
-          {MAX_JUGADORES_PLANILLA}.
-        </p>
-      ))}
-    </Modal>
+    </>
   );
 }
 
 // Vuelca el torneo y los equipos elegidos en los campos de la planilla.
 // `setValue` es el de react-hook-form (methods.setValue).
-export function aplicarTorneoAPlanilla(setValue, { torneo, etiqueta, equipoA, equipoB, partido }) {
+export function aplicarTorneoAPlanilla(
+  setValue,
+  { torneo, etiqueta, equipoA, equipoB, partido, jugadoresA, jugadoresB },
+) {
   const set = (name, value) => setValue(name, value, { shouldDirty: true })
 
-  // Con torneo real usa su nombre; en partido libre usa "SIN TORNEO" o el texto personalizado
   const nombre = torneo?.nombretorneo ?? etiqueta ?? ""
+  set("tournament", nombre)
+  set("head.competition", nombre)
 
-  set("tournament", nombre)       // select del banner
-  set("head.competition", nombre) // "Competition" del encabezado
-
-  // Solo los partidos de un torneo real se vinculan; así un partido libre
-  // nunca registra resultado en ningún torneo (el efecto de gameEnded sale si no hay torneoRef)
   if (torneo && partido) {
     set("torneoRef", { torneo: torneo.nombretorneo, jornadaId: partido.jornadaId, partidoId: partido.id })
   }
 
   if (equipoA || equipoB) {
-    for (const [team, eq] of [["A", equipoA], ["B", equipoB]]) {
+    for (const [team, eq, elegidos] of [["A", equipoA, jugadoresA], ["B", equipoB, jugadoresB]]) {
       if (!eq) continue
       set(`head.team${team}`, eq.nombreequipo)
       set(`team${team}.name`, eq.nombreequipo)
@@ -825,7 +1039,9 @@ export function aplicarTorneoAPlanilla(setValue, { torneo, etiqueta, equipoA, eq
       const asistente = eq.cuerpotecnico.find((m) => m.cargo === CARGO_ASISTENTE)
       set(`team${team}.coachName`, coach?.nombre ?? "")
       set(`team${team}.assistantCoachName`, asistente?.nombre ?? "")
-      eq.roster.slice(0, MAX_JUGADORES_PLANILLA).forEach((j, i) => {
+      // Solo los jugadores confirmados (si no llegan, se usa el roster completo)
+      const jugadores = elegidos ?? eq.roster
+      jugadores.slice(0, MAX_JUGADORES_PLANILLA).forEach((j, i) => {
         set(`team${team}.players.${i}.name`, j.nombre)
         set(`team${team}.players.${i}.number`, j.dorsal)
       })
