@@ -1010,6 +1010,7 @@ export default function FormPlanilla({initialMode="new"}) {
                   </p>
                 </Modal>
               )}
+              
 
               {elegirTorneo && (
                 <IniciarPlanillaModal
